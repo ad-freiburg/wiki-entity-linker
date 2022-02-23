@@ -6,7 +6,7 @@ from spacy.kb import KnowledgeBase
 from spacy.language import Language
 
 from src import settings
-from src.helpers.entity_database_reader import EntityDatabaseReader
+from src.linkers.link_entity_linker import get_mapping
 from src.helpers.label_generator import LabelGenerator
 
 
@@ -53,7 +53,7 @@ def main(args):
     optimizer = nlp.begin_training()
 
     # initialize label generator:
-    mapping = EntityDatabaseReader.get_wikipedia_to_wikidata_mapping()
+    mapping = get_mapping()
     generator = LabelGenerator(nlp, kb, mapping)
 
     # iterate over training examples (batch size 1):
