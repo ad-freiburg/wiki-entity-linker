@@ -146,7 +146,7 @@ class LinkingSystem:
                                         MappingName.WIKIDATA_ALIASES,
                                         MappingName.LANGUAGES,
                                         MappingName.DEMONYMS,
-                                        MappingName.SITELINKS},min_count)
+                                        MappingName.SITELINKS}, min_count)
             self.linker = PopularEntitiesLinker(min_count, self.entity_db, longest_alias_ner)
             self.globally = True
         elif linker_type == Linkers.WIKIFIER.value:

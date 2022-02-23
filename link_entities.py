@@ -30,8 +30,12 @@ from src.models.neural_net import NeuralNet
 
 import multiprocessing
 
+# Don't show dependencygraph UserWarning: "The graph doesn't contain a node that depends on the root element."
+import warnings
+warnings.filterwarnings("ignore", category=UserWarning)
+
 CHUNK_SIZE = 10  # Number of articles submitted to one process as a single task
-MAX_TASKS_PER_CHILD = 1
+MAX_TASKS_PER_CHILD = 5
 
 
 def link_entities_tuple_argument(args_tuple):
