@@ -3,9 +3,9 @@
 ## Docker Instructions
 Get the code, and build and start the container:
 
-    git clone git@github.com:ad-freiburg/elevant.git .
-    docker build -t elevant .
-    docker run -it -v <data_directory>:/data elevant
+    git clone git@github.com:ad-freiburg/wiki_entity_linker.git .
+    docker build -t wiki-entity-linker .
+    docker run -it -v <data_directory>:/data wiki-entity-linker
 
 where `<data_directory>` is the directory in which the required data files will be stored.
 What these data files are and how they are generated is explained in the [Data Generation](#data-generation) section.
@@ -62,6 +62,48 @@ running QLever instance for Wikidata under the URL specified by the variable `AP
 (by default, this is set to https://qlever.cs.uni-freiburg.de/api/wikidata).
 
 ## Usage
+
+### Link Wikipedia Dump
+To link an entire Wikipedia dump using our best system run
+    
+    make link_wiki
+    
+This uses our link-text-linker which links entities based on Wikipedia hyperlinks,
+our popular-entities linker which links remaining entities based on their Wikidata sitelink count with special rules for demonyms,
+and our coreference linker which uses type and gender information of previously linked entities and dependency parse information.
+
+NOTE: Linking the entire Wikipedia dump will take several hours.
+You can adjust the number of processes used for linking via the Makefile variable `NUM_LINKER_PROCESSES`.
+
+The output file (per default `<data_directory>/wikipedia_dump_files/enwiki-latest-linked.jsonl`)
+will contain one json object representing a linked Wikipedia article per line.
+
+#### Link an Additional Recent Wikipedia Dump
+If you want to link a more recent Wikipedia dump than the one that was downloaded during the data generation step,
+first make sure your existing Wikipedia dump files are not being overwritten by either renaming your existing
+`<data_directory>/wikipedia_dump_files/enwiki-latest-pages-articles-multistream.xml.bz2`,
+`<data_directory>/wikipedia_dump_files/enwiki-latest-extracted.jsonl`
+and if you already linked a Wikipedia dump
+`<data_directory>/wikipedia_dump_files/enwiki-latest-linked.jsonl`
+files or by adjusting the `WIKI_DUMP`, `EXTRACTED_WIKI_DUMP` and `LINKED_WIKI_ARTICLES` variables in the Makefile.
+
+Then run
+
+    make download_wiki extract_wiki link_wiki
+
+which will download, extract and link the most recent Wikipedia dump.
+
+#### Create QLever Text Files
+If you want to use the linked Wikipedia dump for full-text search in QLever as described
+[here](https://github.com/ad-freiburg/qlever/blob/master/docs/sparql_plus_text.md) run
+
+    python3 create_qlever_text_files.py <input_file> <output_prefix>
+
+where `<input_file>` is the linked Wikipedia dump file
+(usually `<data_directory>/wikipedia_dump_files/enwiki-latest-linked.jsonl`)
+and `<output_prefix>` is the prefix for the generated output files.
+This will generate two files `<output_prefix>.wordsfile.tsv` and `<output_prefix>.docsfile.tsv`
+which can then be used as input for a SPARQL + Text instance of QLever.
 
 ### Link Benchmark Articles
 If you want to link a single benchmark with a single specified linker configuration, use the script `link_benchmark_entities.py`:
