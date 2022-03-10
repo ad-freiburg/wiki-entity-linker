@@ -1,16 +1,16 @@
 from typing import Iterator, Tuple, Optional
 
-from src.evaluation.benchmark import Benchmark
+from src.evaluation.benchmark import Benchmark, BenchmarkFormat
 from src.evaluation.groundtruth_label import GroundtruthLabel
+from src.helpers.nif_benchmark_reader import NifBenchmarkReader
 from src.helpers.wikipedia_corpus import WikipediaCorpus
-from src.models.wikipedia_article import WikipediaArticle
+from src.models.article import Article
 from src.models.entity_database import EntityDatabase
 from src.models.conll_benchmark import conll_documents
-from src.models.wikipedia_article import article_from_json
+from src.models.article import article_from_json
 from src.helpers.xml_benchmark_reader import XMLBenchmarkParser
 from src import settings
 
-import operator
 import random
 import logging
 
@@ -32,7 +32,7 @@ class WikipediaExampleReader:
     def __init__(self, entity_db: EntityDatabase):
         self.entity_db = entity_db
 
-    def iterate(self, n: int = -1) -> Iterator[WikipediaArticle]:
+    def iterate(self, n: int = -1) -> Iterator[Article]:
         for article in WikipediaCorpus.development_articles(n):
             article.labels = []
             label_id_counter = 0
@@ -49,7 +49,7 @@ class WikipediaExampleReader:
 
 class ConllExampleReader:
     @staticmethod
-    def iterate(n: int = -1) -> Iterator[WikipediaArticle]:
+    def iterate(n: int = -1) -> Iterator[Article]:
         for i, document in enumerate(conll_documents()):
             if i == n:
                 break
@@ -59,7 +59,7 @@ class ConllExampleReader:
 
 class ConllDevExampleReader:
     @staticmethod
-    def iterate(n: int = -1) -> Iterator[WikipediaArticle]:
+    def iterate(n: int = -1) -> Iterator[Article]:
         articles_count = 0
         for i, document in enumerate(conll_documents()):
             if i < 946:
@@ -77,7 +77,7 @@ class ConllDevExampleReader:
 
 class ConllTestExampleReader:
     @staticmethod
-    def iterate(n: int = -1) -> Iterator[WikipediaArticle]:
+    def iterate(n: int = -1) -> Iterator[Article]:
         articles_count = 0
         for i, document in enumerate(conll_documents()):
             if i < 1162:
@@ -90,50 +90,29 @@ class ConllTestExampleReader:
             yield article
 
 
-class PseudoLinkConllExampleReader:
-    def __init__(self, entity_db: EntityDatabase):
-        self.entity_db = entity_db
-
-    def iterate(self, n: int = -1) -> Iterator[WikipediaArticle]:
-        for i, document in enumerate(conll_documents()):
-            if i == n:
-                break
-            article = document.to_article()
-
-            # Store first occurrence of each entity in the article
-            unique_labels = dict()
-            for gt_label in article.labels:
-                label = gt_label.entity_id
-                span = gt_label.span
-                if label not in unique_labels:
-                    unique_labels[label] = span
-            unique_labels = sorted(unique_labels.items(), key=operator.itemgetter(1))
-
-            # Select 60% of unique entities at random (with seed for reproducibility)
-            n_pseudo_links = int(0.6 * len(unique_labels))
-            random_indices = random.sample(range(len(unique_labels)), n_pseudo_links)
-            random_indices = sorted(random_indices)  # links should be sorted
-
-            # Generate pseudo links
-            links = []
-            for index in random_indices:
-                entity_id, span = unique_labels[index]
-                entity_name = self.entity_db.id2wikipedia_name(entity_id)
-                links.append(((span[0], span[1]), entity_name))
-            article.links = links
-            yield article
-
-
 class XMLExampleReader:
     def __init__(self, entity_db: EntityDatabase, labels_file_or_dir: str, text_dir: str):
         self.entity_db = entity_db
         self.labels_file_or_dir = labels_file_or_dir
         self.text_dir = text_dir
 
-    def iterate(self, n: int = -1) -> Iterator[WikipediaArticle]:
+    def iterate(self, n: int = -1) -> Iterator[Article]:
         parser = XMLBenchmarkParser(self.entity_db)
         for i, article in enumerate(parser.article_iterator(self.labels_file_or_dir,
                                                             self.text_dir)):
+            if i == n:
+                break
+            yield article
+
+
+class NifExampleReader:
+    def __init__(self, entity_db: EntityDatabase, benchmark_path: str):
+        self.entity_db = entity_db
+        self.benchmark_path = benchmark_path
+
+    def iterate(self, n: int = -1) -> Iterator[Article]:
+        parser = NifBenchmarkReader(self.entity_db)
+        for i, article in enumerate(parser.article_iterator(self.benchmark_path)):
             if i == n:
                 break
             yield article
@@ -143,7 +122,7 @@ class JsonBenchmarkExampleReader:
     def __init__(self, benchmark_filename: str):
         self.benchmark_filename = benchmark_filename
 
-    def iterate(self, n: int = -1) -> Iterator[WikipediaArticle]:
+    def iterate(self, n: int = -1) -> Iterator[Article]:
         with open(self.benchmark_filename, "r") as benchmark_file:
             for i, json_line in enumerate(benchmark_file):
                 if i == n:
@@ -152,29 +131,21 @@ class JsonBenchmarkExampleReader:
                 yield article
 
 
-def get_example_generator(benchmark_name: str, from_json_file: Optional[bool] = True):
-    path = "benchmarks/"
-    if from_json_file:
-        if benchmark_name == Benchmark.WIKI_EX.value:
-            benchmark_filename = path + "benchmark_labels_wiki-ex.jsonl"
-        elif benchmark_name == Benchmark.CONLL_DEV.value:
-            benchmark_filename = path + "benchmark_labels_conll-dev.jsonl"
-        elif benchmark_name == Benchmark.CONLL_TEST.value:
-            benchmark_filename = path + "benchmark_labels_conll-test.jsonl"
-        elif benchmark_name == Benchmark.CONLL.value:
-            benchmark_filename = path + "benchmark_labels_conll.jsonl"
-        elif benchmark_name == Benchmark.ACE.value:
-            benchmark_filename = path + "benchmark_labels_ace.jsonl"
-        elif benchmark_name == Benchmark.MSNBC.value:
-            benchmark_filename = path + "benchmark_labels_msnbc.jsonl"
-        elif benchmark_name == Benchmark.ACE_ORIGINAL.value:
-            benchmark_filename = path + "benchmark_labels_ace-original.jsonl"
-        elif benchmark_name == Benchmark.MSNBC_ORIGINAL.value:
-            benchmark_filename = path + "benchmark_labels_msnbc-original.jsonl"
-        elif benchmark_name == Benchmark.NEWSCRAWL.value:
-            benchmark_filename = path + "benchmark_labels_newscrawl.jsonl"
+def get_example_generator(benchmark_name: str, from_json_file: Optional[bool] = True,
+                          benchmark_file: Optional[str] = None, benchmark_format: Optional[BenchmarkFormat] = None):
+    if benchmark_file:
+        if benchmark_format == BenchmarkFormat.NIF.value:
+            logger.info("Load mappings for NIF example generator...")
+            entity_db = EntityDatabase()
+            entity_db.load_wikipedia_wikidata_mapping()
+            entity_db.load_redirects()
+            logger.info("-> Mappings loaded.")
+            example_generator = NifExampleReader(entity_db, benchmark_file)
         else:
-            raise ValueError("%s is not a known benchmark." % benchmark_name)
+            # Per default, assume OURS_JSONL format
+            example_generator = JsonBenchmarkExampleReader(benchmark_file)
+    elif from_json_file:
+        benchmark_filename = settings.BENCHMARK_DIR + "benchmark_labels_" + benchmark_name + ".jsonl"
         example_generator = JsonBenchmarkExampleReader(benchmark_filename)
     else:
         if benchmark_name == Benchmark.CONLL.value:
@@ -186,7 +157,7 @@ def get_example_generator(benchmark_name: str, from_json_file: Optional[bool] = 
         elif benchmark_name == Benchmark.WIKI_EX.value:
             example_generator = JsonBenchmarkExampleReader(settings.WIKI_EX_BENCHMARK_FILE)
         elif benchmark_name == Benchmark.NEWSCRAWL.value:
-            example_generator = JsonBenchmarkExampleReader(path + "benchmark_labels_newscrawl.jsonl")
+            example_generator = JsonBenchmarkExampleReader(settings.BENCHMARK_DIR + "benchmark_labels_newscrawl.jsonl")
         else:
             logger.info("Load mappings for example generator...")
             entity_db = EntityDatabase()
@@ -209,8 +180,6 @@ def get_example_generator(benchmark_name: str, from_json_file: Optional[bool] = 
                 example_generator = XMLExampleReader(entity_db,
                                                      settings.MSNBC_ORIGINAL_BENCHMARK_LABELS,
                                                      settings.MSNBC_ORIGINAL_BENCHMARK_TEXTS)
-            elif benchmark_name == Benchmark.CONLL_PSEUDO_LINKS.value:
-                example_generator = PseudoLinkConllExampleReader(entity_db)
             elif benchmark_name == Benchmark.WIKIPEDIA.value:
                 example_generator = WikipediaExampleReader(entity_db)
             else:

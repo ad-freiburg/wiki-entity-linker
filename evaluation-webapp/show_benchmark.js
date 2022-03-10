@@ -20,37 +20,37 @@ copy_latex_text = "Copy LaTeX code for table";
 
 header_descriptions = {
     "undetected": {
-        "all": "The span of a GT mention was not linked (= NER FN) / Named GT mentions",
-        "lowercase": "The span of a lowercase GT mention was not linked / Named lowercase GT mentions",
-        "partially_included": "FN and a part of the GT mention was linked to an arbitrary entity / Named GT mentions containing whitespace(s)",
-        "partial_overlap": "FN and the GT span overlaps with a predicted span / Named uppercase GT mentions",
-        "other": "Other detection error / Named uppercase GT mentions"
+        "all": "The span of a GT mention was not linked (= NER FN) (Total: Named GT mentions)",
+        "lowercase": "The span of a lowercase GT mention was not linked (Total: Named lowercase GT mentions)",
+        "partially_included": "FN and a part of the GT mention was linked to an arbitrary entity (Total: Named GT mentions containing whitespace(s))",
+        "partial_overlap": "FN and the GT span overlaps with a predicted span (Total: Named uppercase GT mentions)",
+        "other": "Other detection error (Total: Named uppercase GT mentions)"
     },
     "wrong_disambiguation": {
-        "all": "Detected, but wrong entity linked / Detected",
-        "demonym": "FN from a list of demonyms (German, Germans, ...) / All demonym GT mentions",
-        "partial_name": "FN and the GT mention is part of the entity name / Named GT mentions where the mention is a part of the entity name",
-        "metonymy": "Predicted and most popular candidate are locations, but ground truth is not / Most popular candidate is a location, but ground truth is not",
-        "rare": "Most popular candidate is wrongly predicted / Detected mentions where the most popular candidate is not the correct entity",
+        "all": "Detected, but wrong entity linked (Total: Detected)",
+        "demonym": "FN from a list of demonyms (German, Germans, ...) (Total: All demonym GT mentions)",
+        "partial_name": "FN and the GT mention is part of the entity name (Total: Named GT mentions where the mention is a part of the entity name)",
+        "metonymy": "Predicted and most popular candidate are locations, but ground truth is not (Total: Most popular candidate is a location, but ground truth is not)",
+        "rare": "Most popular candidate is wrongly predicted (Total: Detected mentions where the most popular candidate is not the correct entity)",
         "other": "Other disambiguation error",
-        "wrong_candidates": "A GT mention was recognized but the GT entity is not among the candidates / Named detected",
-        "multi_candidates": "A GT mention was recognized and the GT entity is one of the candidates, but the wrong candidate was selected / Named detected where the GT entity is one of multiple candidates"
+        "wrong_candidates": "A GT mention was recognized but the GT entity is not among the candidates (Total: Named detected)",
+        "multi_candidates": "A GT mention was recognized and the GT entity is one of the candidates, but the wrong candidate was selected (Total: Named detected where the GT entity is one of multiple candidates)"
     },
     "false_detection": {
         "all": "Predicted mention that does not match a groundtruth mention span",
         "abstract_entity": "Lowercase named FP that does not overlap with a GT mention",
         "unknown_entity": "Uppercase mention wrongly linked, where the ground truth is either Unknown or has no label at all",
         "other": "Other false detection",
-        "wrong_span": "Predicted mention whose span does not match, but overlaps with a GT mention with a matching entity / Predicted mentions"
+        "wrong_span": "Predicted mention whose span does not match, but overlaps with a GT mention with a matching entity (Total: Predicted mentions)"
     },
     "other_errors": {
-        "hyperlink": "FN where the mention is a hyperlink / GT mentions that are hyperlinks"
+        "hyperlink": "FN where the mention is a hyperlink (Total: GT mentions that are hyperlinks)"
     },
     "wrong_coreference": {
         "false_detection": "FP mentions in {It, it, This, this, That, that, Its, its}",
-        "reference_wrongly_disambiguated": "FN + FP, the reference was wrongly disambiguated / Coreference mentions where correct GT mention was referenced",
-        "wrong_mention_referenced": "FN + FP, wrong mention was referenced / Linked GT coreference mentions",
-        "undetected": "FN, mention was not linked / GT coreference mentions"
+        "reference_wrongly_disambiguated": "FN + FP, the reference was wrongly disambiguated (Total: Coreference mentions where correct GT mention was referenced)",
+        "wrong_mention_referenced": "FN + FP, wrong mention was referenced (Total: Linked GT coreference mentions)",
+        "undetected": "FN, mention was not linked (Total: GT coreference mentions)"
     }
 };
 
@@ -96,9 +96,6 @@ mention_type_headers = {"entity": ["entity_named", "entity_other"],
                         "entity_other": ["entity_other"],
                         "nominal": ["nominal"],
                         "pronominal": ["pronominal"]};
-
-benchmark_names = ["wiki-ex", "conll", "conll-dev", "conll-test", "ace", "msnbc", "newscrawl", "msnbc-original", "ace-original"];
-
 
 $("document").ready(function() {
     read_url_parameters();
@@ -1548,10 +1545,9 @@ function build_overview_table(benchmark_name, default_selected_systems, default_
                 $(folder_data).find("a").each(function() {
                     var file_name = $(this).attr("href");
                     // This assumes the benchmark is specified in the last dot separated column before the
-                    // file extension if it is not our wiki-ex benchmark.
+                    // file extension.
                     var benchmark = file_name.split(".").slice(-2)[0];
-                    var benchmark_match = ((benchmark_name == "wiki-ex" && !benchmark_names.includes(benchmark)) || benchmark == benchmark_name);
-                    if (file_name.endsWith(RESULTS_EXTENSION) && benchmark_match) {
+                    if (file_name.endsWith(RESULTS_EXTENSION) && benchmark == benchmark_name) {
                         var url = path + "/" + folder + "/" + file_name;
                         urls.push(url);
                     }

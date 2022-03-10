@@ -7,7 +7,7 @@ from urllib.parse import quote
 from src import settings
 from src.linkers.linkers import Linkers, LinkLinkers, CoreferenceLinkers
 from src.linkers.linking_system import LinkingSystem
-from src.models.wikipedia_article import WikipediaArticle, article_from_json
+from src.models.article import Article, article_from_json
 
 app = Flask(__name__)
 
@@ -17,7 +17,7 @@ def nif_api():
     nif_body = request.data
     nif_doc = NIFCollection.loads(nif_body)
     for context in nif_doc.contexts:
-        article = WikipediaArticle(-1, "", context.mention, [])
+        article = Article(-1, "", context.mention, [])
         if args.input_predictions:
             first_characters = article.text[:100]
             if first_characters in article_dict:
@@ -60,11 +60,11 @@ if __name__ == "__main__":
                         "EXPLOSION: Full path to the saved model.\n"
                         "AMBIVERSE: Full path to the predictions directory (for Wikipedia or own benchmark only).\n"
                         "IOB: Full path to the prediction file in IOB format (for CoNLL benchmark only).\n")
-    parser.add_argument("-kb", "--kb_name", type=str, choices=["wikipedia"], default=None,
+    parser.add_argument("-kb", "--kb_name", type=str, choices=["wikipedia"],
                         help="Name of the knowledge base to use with a spacy linker.")
-    parser.add_argument("-ll", "--link_linker", choices=[ll.value for ll in LinkLinkers], default=None,
+    parser.add_argument("-ll", "--link_linker", choices=[ll.value for ll in LinkLinkers],
                         help="Link linker to apply before spacy or explosion linker")
-    parser.add_argument("-coref", "--coreference_linker", choices=[cl.value for cl in CoreferenceLinkers], default=None,
+    parser.add_argument("-coref", "--coreference_linker", choices=[cl.value for cl in CoreferenceLinkers],
                         help="Coreference linker to apply after entity linkers.")
     parser.add_argument("--only_pronouns", action="store_true",
                         help="Only link coreferences that are pronouns.")

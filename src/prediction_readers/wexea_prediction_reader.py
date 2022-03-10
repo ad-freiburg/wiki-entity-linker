@@ -7,14 +7,17 @@ import os
 import re
 import logging
 
+from src.prediction_readers.abstract_prediction_reader import AbstractPredictionReader
+
 logger = logging.getLogger("main." + __name__.split(".")[-1])
 
 
-class WexeaPredictionReader:
+class WexeaPredictionReader(AbstractPredictionReader):
     _link_re = re.compile(r"\[\[([^\[].*?)\|(.*?)\|(.*?[^\]])\]\]")
 
-    def __init__(self, entity_db: EntityDatabase):
+    def __init__(self, input_filepath, entity_db: EntityDatabase):
         self.entity_db = entity_db
+        super().__init__(input_filepath, predictions_iterator_implemented=True)
 
     def _get_prediction_from_file(self, file_path: str, coref: bool) -> Dict[Tuple[int, int], EntityPrediction]:
         """
@@ -55,24 +58,23 @@ class WexeaPredictionReader:
             logger.warning("\n%d entity labels could not be matched to any Wikidata ID." % no_mapping_count)
         return predictions
 
-    def article_predictions_iterator(self, disambiguation_dir: str) \
-            -> Iterator[Dict[Tuple[int, int], EntityPrediction]]:
+    def predictions_iterator(self) -> Iterator[Dict[Tuple[int, int], EntityPrediction]]:
         """
-        Yields predictions for each WEXEA disambiguation result file in the
-        given directory without coreference predictions.
+        Yields predictions for each article.
+
+        :return: iterator over dictionaries with predictions for each article
         """
-        for file in sorted(os.listdir(disambiguation_dir)):
-            file_path = os.path.join(disambiguation_dir, file)
+        for file in sorted(os.listdir(self.input_filepath)):
+            file_path = os.path.join(self.input_filepath, file)
             predictions = self._get_prediction_from_file(file_path, coref=False)
             yield predictions
 
-    def article_coref_predictions_iterator(self, disambiguation_dir: str) \
-            -> Iterator[Dict[Tuple[int, int], EntityPrediction]]:
+    def article_coref_predictions_iterator(self) -> Iterator[Dict[Tuple[int, int], EntityPrediction]]:
         """
         Yields coreference predictions for each WEXEA disambiguation result file
         in the given directory.
         """
-        for file in sorted(os.listdir(disambiguation_dir)):
-            file_path = os.path.join(disambiguation_dir, file)
+        for file in sorted(os.listdir(self.input_filepath)):
+            file_path = os.path.join(self.input_filepath, file)
             predictions = self._get_prediction_from_file(file_path, coref=True)
             yield predictions

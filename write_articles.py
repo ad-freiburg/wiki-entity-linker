@@ -26,12 +26,12 @@ import re
 from typing import Dict, Optional
 from enum import Enum
 
-from src.evaluation.benchmark import Benchmark
+from src.evaluation.benchmark import get_available_benchmarks
 from src.helpers.entity_database_reader import EntityDatabaseReader
 from src.helpers.wikipedia_dump_reader import WikipediaDumpReader
 from src.evaluation.examples_generator import get_example_generator
 from src.models.wikidata_entity import WikidataEntity
-from src.models.wikipedia_article import WikipediaArticle, article_from_json
+from src.models.article import Article, article_from_json
 
 logging.basicConfig(format='%(asctime)s: %(message)s', datefmt="%H:%M:%S", level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -48,7 +48,7 @@ def replace_non_ascii_chars(text: str) -> str:
     return ''.join([char if ord(char) < 128 else '_' for char in text])
 
 
-def get_entity_text(article: WikipediaArticle,
+def get_entity_text(article: Article,
                     entities: Dict[str, WikidataEntity],
                     annotation: Optional[Annotation] = Annotation.LABELS,
                     evaluation_span: Optional[bool] = False):
@@ -261,7 +261,7 @@ if __name__ == "__main__":
     group_input.add_argument("-i", "--input_file", type=str,
                              help="Input file with one article per line in jsonl format.")
 
-    group_input.add_argument("-b", "--input_benchmark", choices=[b.value for b in Benchmark],
+    group_input.add_argument("-b", "--input_benchmark", choices=get_available_benchmarks(),
                              help="Iterate over benchmark articles of the given benchmark.")
 
     group_input.add_argument("--input_wiki_dump", default=False, action="store_true",
@@ -281,7 +281,7 @@ if __name__ == "__main__":
     parser.add_argument("--one_article_per_line", action="store_true",
                         help="An article is written to a single line.")
 
-    parser.add_argument("-n", "--n_articles", type=int, default=None,
+    parser.add_argument("-n", "--n_articles", type=int,
                         help="Maximum number of articles to process.")
 
     parser.add_argument("--evaluation_span", default=False, action="store_true",

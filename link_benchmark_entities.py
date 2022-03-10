@@ -21,15 +21,15 @@ import sys
 import os
 
 from src import settings
-from src.evaluation.benchmark import Benchmark
 from src.linkers.linkers import Linkers, CoreferenceLinkers, LinkLinkers
+from src.evaluation.benchmark import Benchmark, get_available_benchmarks
 from src.linkers.linking_system import LinkingSystem
 from src.evaluation.examples_generator import get_example_generator
 
 
 def main(args):
     if args.link_linker:
-        if args.benchmark != Benchmark.WIKI_EX.value and args.benchmark != Benchmark.CONLL_PSEUDO_LINKS.value:
+        if args.benchmark != Benchmark.WIKI_EX.value:
             logger.warning("Using a link linker only makes sense over benchmarks that contain hyperlinks.")
     if args.coreference_linker == "wexea" and not args.linker_type == "wexea":
         logger.error("Wexea can only be used as coreference linker in combination with the Wexea linker")
@@ -46,12 +46,13 @@ def main(args):
 
     example_generator = get_example_generator(args.benchmark)
 
-    out_dir = os.path.dirname(args.output_file)
-    if out_dir and not os.path.exists(out_dir):
-        logger.info("Creating directory %s" % out_dir)
-        os.makedirs(out_dir)
+    output_dir = args.evaluation_dir + args.linker_type
+    output_filename = output_dir + "/" + args.experiment_name + "." + args.benchmark + ".jsonl"
+    if output_dir and not os.path.exists(output_dir):
+        logger.info("Creating directory %s" % output_dir)
+        os.makedirs(output_dir)
 
-    output_file = open(args.output_file, 'w', encoding='utf8')
+    output_file = open(output_filename, 'w', encoding='utf8')
 
     logger.info("Linking entities in %s benchmark ..." % args.benchmark)
 
@@ -66,15 +67,16 @@ def main(args):
 
     output_file.close()
 
-    logger.info("Wrote %d linked articles to %s" % (i+1, args.output_file))
+    logger.info("Wrote %d linked articles to %s" % (i+1, output_filename))
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter,
                                      description=__doc__)
 
-    parser.add_argument("output_file", type=str, default=None,
-                        help="Output file for the evaluation results")
+    parser.add_argument("experiment_name", type=str,
+                        help="Name for the resulting file. The linking results will be written to "
+                             "<evaluation_dir>/<linker_type>/<experiment_name>.<benchmark_name>.jsonl")
     parser.add_argument("linker_type", choices=[li.value for li in Linkers],
                         help="Entity linker type.")
     parser.add_argument("linker",
@@ -84,16 +86,17 @@ if __name__ == "__main__":
                              "EXPLOSION: Full path to the saved model.\n"
                              "AMBIVERSE: Full path to the predictions directory.\n"
                              "IOB: Full path to the prediction file in IOB format (for CoNLL benchmark only).\n")
-    parser.add_argument("-b", "--benchmark", choices=[b.value for b in Benchmark], default=Benchmark.WIKI_EX.value,
+    parser.add_argument("-b", "--benchmark", choices=get_available_benchmarks(), required=True,
                         help="Benchmark over which to evaluate the linker.")
+    parser.add_argument("-dir", "--evaluation_dir", default=settings.EVALUATION_RESULTS_DIR,
+                        help="Directory to which the evaluation result files are written.")
     parser.add_argument("-n", "--n_articles", type=int, default=-1,
                         help="Number of articles to evaluate on.")
-    parser.add_argument("-kb", "--kb_name", type=str, choices=["wikipedia"], default=None,
+    parser.add_argument("-kb", "--kb_name", type=str, choices=["wikipedia"],
                         help="Name of the knowledge base to use with a spacy linker.")
-    parser.add_argument("-ll", "--link_linker", choices=[ll.value for ll in LinkLinkers], default=None,
+    parser.add_argument("-ll", "--link_linker", choices=[ll.value for ll in LinkLinkers],
                         help="Link linker to apply before spacy or explosion linker")
-    parser.add_argument("-coref", "--coreference_linker",
-                        choices=[cl.value for cl in CoreferenceLinkers], default=None,
+    parser.add_argument("-coref", "--coreference_linker", choices=[cl.value for cl in CoreferenceLinkers],
                         help="Coreference linker to apply after entity linkers.")
     parser.add_argument("--only_pronouns", action="store_true",
                         help="Only link coreferences that are pronouns.")

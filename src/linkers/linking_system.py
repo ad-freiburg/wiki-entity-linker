@@ -1,30 +1,31 @@
 from typing import Optional, Tuple, Dict, Set
 
-from src.helpers.neural_el_prediction_reader import NeuralELPredictionReader
-from src.helpers.wexea_prediction_reader import WexeaPredictionReader
-from src.helpers.wikifier_prediction_reader import WikifierPredictionReader
+from src.prediction_readers.wexea_prediction_reader import WexeaPredictionReader
+from src.prediction_readers.neural_el_prediction_reader import NeuralELPredictionReader
+from src.prediction_readers.nif_prediction_reader import NifPredictionReader
+from src.prediction_readers.wikifier_prediction_reader import WikifierPredictionReader
+from src.prediction_readers.ambiverse_prediction_reader import AmbiversePredictionReader
+from src.prediction_readers.conll_iob_prediction_reader import ConllIobPredictionReader
 from src.linkers.alias_entity_linker import LinkingStrategy, AliasEntityLinker
-from src.helpers.ambiverse_prediction_reader import AmbiversePredictionReader
-from src.helpers.conll_iob_prediction_reader import ConllIobPredictionReader
 from src.linkers.bert_entity_linker import BertEntityLinker
 from src.linkers.entity_coref_linker import EntityCorefLinker
 from src.linkers.linkers import Linkers, LinkLinkers, CoreferenceLinkers
 from src.linkers.popular_entities_linker import PopularEntitiesLinker
 from src.linkers.prior_linker import PriorLinker
 from src.linkers.trained_entity_linker import TrainedEntityLinker
-from src.models.entity_database import EntityDatabase, MappingName
-from src.models.entity_prediction import EntityPrediction
-from src.linkers.explosion_linker import ExplosionEntityLinker
-from src.linkers.hobbs_coref_linker import HobbsCorefLinker
 from src.linkers.link_entity_linker import LinkEntityLinker
 from src.linkers.link_text_entity_linker import LinkTextEntityLinker
-from src.ner.maximum_matching_ner import MaximumMatchingNER
+from src.linkers.explosion_linker import ExplosionEntityLinker
+from src.linkers.hobbs_coref_linker import HobbsCorefLinker
 from src.linkers.neuralcoref_coref_linker import NeuralcorefCorefLinker
 from src.linkers.stanford_corenlp_coref_linker import StanfordCoreNLPCorefLinker
 from src.linkers.tagme_linker import TagMeLinker
 from src.linkers.trained_spacy_entity_linker import TrainedSpacyEntityLinker
-from src.models.wikipedia_article import WikipediaArticle
 from src.linkers.xrenner_coref_linker import XrennerCorefLinker
+from src.models.article import Article
+from src.models.entity_database import EntityDatabase, MappingName
+from src.models.entity_prediction import EntityPrediction
+from src.ner.maximum_matching_ner import MaximumMatchingNER
 
 import torch
 import logging
@@ -49,7 +50,7 @@ class LinkingSystem:
                  longest_alias_ner: bool, type_mapping_file: str):
         self.link_linker = None
         self.linker = None
-        self.prediction_iterator = None
+        self.prediction_reader = None
         self.coref_linker = None
         self.coref_prediction_iterator = None
         self.entity_db = None
@@ -63,7 +64,8 @@ class LinkingSystem:
 
     def _initialize_entity_db(self, linker_type: str, linker: str, link_linker: str, coref_linker: str, min_score: int):
         # Linkers for which not to load entities into the entity database
-        no_db_linkers = (Linkers.TAGME.value, Linkers.AMBIVERSE.value, Linkers.IOB.value, Linkers.NONE.value)
+        no_db_linkers = (Linkers.TAGME.value, Linkers.AMBIVERSE.value, Linkers.IOB.value, Linkers.NONE.value,
+                         Linkers.NIF.value)
 
         self.entity_db = EntityDatabase()
 
@@ -88,13 +90,12 @@ class LinkingSystem:
             self.linker = ExplosionEntityLinker(path, entity_db=self.entity_db)
         elif linker_type == Linkers.IOB.value:
             path = linker_info
-            self.prediction_iterator = ConllIobPredictionReader.document_predictions_iterator(path)
+            self.prediction_reader = ConllIobPredictionReader(path)
         elif linker_type == Linkers.AMBIVERSE.value:
             self.load_missing_mappings({MappingName.WIKIPEDIA_WIKIDATA,
                                         MappingName.REDIRECTS})
             result_dir = linker_info
-            self.prediction_iterator = AmbiversePredictionReader(self.entity_db).\
-                article_predictions_iterator(result_dir)
+            self.prediction_reader = AmbiversePredictionReader(result_dir, self.entity_db)
         elif linker_type == Linkers.TAGME.value:
             self.load_missing_mappings({MappingName.WIKIPEDIA_WIKIDATA,
                                         MappingName.REDIRECTS})
@@ -104,13 +105,12 @@ class LinkingSystem:
             result_dir = linker_info
             self.load_missing_mappings({MappingName.WIKIPEDIA_WIKIDATA,
                                         MappingName.REDIRECTS})
-            self.prediction_iterator = WexeaPredictionReader(self.entity_db).article_predictions_iterator(result_dir)
+            self.prediction_iterator = WexeaPredictionReader(result_dir, self.entity_db)
         elif linker_type == Linkers.NEURAL_EL.value:
             result_file = linker_info
             self.load_missing_mappings({MappingName.WIKIPEDIA_WIKIDATA,
                                         MappingName.REDIRECTS})
-            self.prediction_iterator = NeuralELPredictionReader(self.entity_db).\
-                article_predictions_iterator(result_file)
+            self.prediction_reader = NeuralELPredictionReader(result_file, self.entity_db)
         elif linker_type == Linkers.BASELINE.value:
             if linker_info not in ("links", "scores", "links-all", "max-match-ner"):
                 raise NotImplementedError("Unknown strategy '%s'." % linker_info)
@@ -154,7 +154,7 @@ class LinkingSystem:
                                         MappingName.REDIRECTS,
                                         MappingName.WIKIPEDIA_ID_WIKIPEDIA_TITLE})
             result_dir = linker_info
-            self.prediction_iterator = WikifierPredictionReader(self.entity_db).article_predictions_iterator(result_dir)
+            self.prediction_reader = WikifierPredictionReader(result_dir, self.entity_db)
         elif linker_type == Linkers.PURE_PRIOR.value or linker_type == Linkers.POS_PRIOR.value:
             whitelist_file = linker_info
             self.load_missing_mappings({MappingName.WIKIPEDIA_WIKIDATA,
@@ -163,6 +163,11 @@ class LinkingSystem:
                                         MappingName.NAME_ALIASES,
                                         MappingName.WIKIDATA_ALIASES})
             self.linker = PriorLinker(self.entity_db, whitelist_file, use_pos=linker_type == Linkers.POS_PRIOR.value)
+        elif linker_type == Linkers.NIF.value:
+            result_file = linker_info
+            self.load_missing_mappings({MappingName.WIKIPEDIA_WIKIDATA,
+                                        MappingName.REDIRECTS})
+            self.prediction_reader = NifPredictionReader(result_file, self.entity_db)
         else:
             linker_exists = False
 
@@ -212,8 +217,8 @@ class LinkingSystem:
             result_dir = linker_info
             self.load_missing_mappings({MappingName.WIKIPEDIA_WIKIDATA,
                                         MappingName.REDIRECTS})
-            self.coref_prediction_iterator = WexeaPredictionReader(self.entity_db)\
-                .article_coref_predictions_iterator(result_dir)
+            self.coref_prediction_iterator = WexeaPredictionReader(result_dir, self.entity_db)\
+                .article_coref_predictions_iterator()
         else:
             linker_exists = False
 
@@ -223,7 +228,7 @@ class LinkingSystem:
             logger.info("Coref linker type not found or not specified.")
 
     def link_entities(self,
-                      article: WikipediaArticle,
+                      article: Article,
                       uppercase: Optional[bool] = False,
                       only_pronouns: Optional[bool] = False,
                       evaluation_span: Optional[Tuple[int, int]] = None):
@@ -237,8 +242,8 @@ class LinkingSystem:
 
         if self.linker:
             self.linker.link_entities(article, doc, uppercase=uppercase, globally=self.globally)
-        elif self.prediction_iterator:
-            predicted_entities = next(self.prediction_iterator)
+        elif self.prediction_reader:
+            predicted_entities = self.prediction_reader.get_predictions(article)
             if uppercase:
                 predicted_entities = uppercase_predictions(predicted_entities, article.text)
             article.link_entities(predicted_entities, "PREDICTION_READER", "PREDICTION_READER")

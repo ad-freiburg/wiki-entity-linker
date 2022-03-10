@@ -3,14 +3,14 @@ from typing import List, Set, Tuple, Optional
 from itertools import chain
 
 from src.evaluation.case import Case, ErrorLabel
-from src.evaluation.groundtruth_label import GroundtruthLabel, is_level_one
-from src.evaluation.mention_type import MentionType
+from src.evaluation.groundtruth_label import GroundtruthLabel
+from src.evaluation.mention_type import MentionType, is_named_entity
 from src.models.entity_database import EntityDatabase
 from src.models.wikidata_entity import WikidataEntity
-from src.models.wikipedia_article import WikipediaArticle
+from src.models.article import Article
 
 
-def label_errors(article: WikipediaArticle,
+def label_errors(article: Article,
                  cases: List[Case],
                  entity_db: EntityDatabase,
                  contains_unknowns: bool):
@@ -61,7 +61,7 @@ def label_undetected_errors(cases: List[Case]):
     for case in cases:
         if case.is_not_coreference() and case.is_false_negative() and case.predicted_entity is None:
             case.add_error_label(ErrorLabel.UNDETECTED)
-            if not is_level_one(case.text):
+            if not is_named_entity(case.text):
                 case.add_error_label(ErrorLabel.UNDETECTED_LOWERCASE)
             elif is_specificity_error(case, false_positive_spans):
                 case.add_error_label(ErrorLabel.UNDETECTED_PARTIALLY_INCLUDED)
@@ -283,7 +283,7 @@ def label_false_detections(cases: List[Case],
                 case.add_error_label(ErrorLabel.FALSE_DETECTION_OTHER)
 
 
-def label_hyperlink_errors(article: WikipediaArticle, cases: List[Case]):
+def label_hyperlink_errors(article: Article, cases: List[Case]):
     hyperlink_spans = set(span for span, target in article.links)
     for case in cases:
         if case.span in hyperlink_spans and case.has_ground_truth() and case.is_known_entity():

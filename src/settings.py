@@ -67,7 +67,7 @@ WIKIPEDIA_ABSTRACTS_FILE = DATA_DIRECTORY + "wikipedia_mappings/article_abstract
 
 # Spacy knowledge base files
 KB_FILE = DATA_DIRECTORY + "spacy_knowledge_bases/wikidata/kb"
-KB_DIRECTORY = DATA_DIRECTORY + "spacy_knowledge_bases/wikidata/"
+KB_DIRECTORY = DATA_DIRECTORY + "spacy_knowledge_bases/"
 VOCAB_DIRECTORY = DATA_DIRECTORY + "spacy_knowledge_bases/wikidata/vocab"
 VECTORS_DIRECTORY = DATA_DIRECTORY + "spacy_knowledge_bases/vectors/vectors"
 VECTORS_ABSTRACTS_DIRECTORY = DATA_DIRECTORY + "spacy_knowledge_bases/vectors/vectors_abstracts/"
@@ -94,10 +94,11 @@ MSNBC_BENCHMARK_LABELS = DATA_DIRECTORY + "benchmarks/msnbc/msnbc.xml"
 MSNBC_ORIGINAL_BENCHMARK_TEXTS = DATA_DIRECTORY + "benchmarks/msnbc.original/RawTextsSimpleChars_utf8/"
 MSNBC_ORIGINAL_BENCHMARK_LABELS = DATA_DIRECTORY + "benchmarks/msnbc.original/Problems/"
 
-WIKI_EX_BENCHMARK_FILE = "benchmarks/benchmark_labels_wiki-ex.jsonl"
-
+BENCHMARK_DIR = "benchmarks/"
+WIKI_EX_BENCHMARK_FILE = BENCHMARK_DIR + "benchmark_labels_wiki-ex.jsonl"
 
 # Other files and paths
+EVALUATION_RESULTS_DIR = "evaluation_results/"
 LOG_PATH = "logs/"
 
 

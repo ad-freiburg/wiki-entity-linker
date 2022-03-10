@@ -6,13 +6,15 @@ from src.models.entity_prediction import EntityPrediction
 import json
 import logging
 
+from src.prediction_readers.abstract_prediction_reader import AbstractPredictionReader
+
 logger = logging.getLogger("main." + __name__.split(".")[-1])
 
 
-class NeuralELPredictionReader:
-
-    def __init__(self, entity_db: EntityDatabase):
+class NeuralELPredictionReader(AbstractPredictionReader):
+    def __init__(self, input_filepath: str, entity_db: EntityDatabase):
         self.entity_db = entity_db
+        super().__init__(input_filepath, predictions_iterator_implemented=True)
 
     def _get_prediction_from_jsonl(self, string: str) -> Dict[Tuple[int, int], EntityPrediction]:
         """
@@ -39,13 +41,14 @@ class NeuralELPredictionReader:
             logger.warning("\n%d entity labels could not be matched to any Wikidata ID." % count)
         return predictions
 
-    def article_predictions_iterator(self, file_path: str) \
-            -> Iterator[Dict[Tuple[int, int], EntityPrediction]]:
+    def predictions_iterator(self) -> Iterator[Dict[Tuple[int, int], EntityPrediction]]:
         """
         Yields predictions for each Neural EL disambiguation result in the
-        given file, with one line per article.
+        disambiguation_file with one line per article.
+
+        :return: iterator over dictionaries with predictions for each article
         """
-        with open(file_path, "r", encoding="utf8") as file:
+        with open(self.input_filepath, "r", encoding="utf8") as file:
             for line in file:
                 predictions = self._get_prediction_from_jsonl(line)
                 yield predictions

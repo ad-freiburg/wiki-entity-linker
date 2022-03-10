@@ -24,7 +24,7 @@ import log
 from src import settings
 from src.linkers.linkers import Linkers, LinkLinkers, CoreferenceLinkers
 from src.linkers.linking_system import LinkingSystem
-from src.models.wikipedia_article import WikipediaArticle
+from src.models.article import Article
 from src.helpers.wikipedia_dump_reader import WikipediaDumpReader
 from src.models.neural_net import NeuralNet
 
@@ -52,7 +52,7 @@ def article_iterator(filename):
             if i == args.n_articles:
                 break
             if args.raw_input:
-                article = WikipediaArticle(id=i, title="", text=line[:-1], links=[])
+                article = Article(id=i, title="", text=line[:-1], links=[])
             else:
                 article = WikipediaDumpReader.json2article(line)
             yield article, args.uppercase, args.only_pronouns
@@ -105,9 +105,9 @@ def main():
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter, description=__doc__)
 
-    parser.add_argument("input_file", type=str, default=None,
+    parser.add_argument("input_file", type=str,
                         help="Input file with articles in JSON format or raw text.")
-    parser.add_argument("output_file", type=str, default=None,
+    parser.add_argument("output_file", type=str,
                         help="Output file.")
     parser.add_argument("linker_type", choices=[li.value for li in Linkers],
                         help="Entity linker type.")
@@ -122,11 +122,11 @@ if __name__ == "__main__":
                         help="Set to use an input file with raw text.")
     parser.add_argument("-n", "--n_articles", type=int, default=-1,
                         help="Number of articles to link.")
-    parser.add_argument("-kb", "--kb_name", type=str, choices=["wikipedia"], default=None,
+    parser.add_argument("-kb", "--kb_name", type=str, choices=["wikipedia"],
                         help="Name of the knowledge base to use with a spacy linker.")
-    parser.add_argument("-ll", "--link_linker", choices=[ll.value for ll in LinkLinkers], default=None,
+    parser.add_argument("-ll", "--link_linker", choices=[ll.value for ll in LinkLinkers],
                         help="Link linker to apply before spacy or explosion linker")
-    parser.add_argument("-coref", "--coreference_linker", choices=[cl.value for cl in CoreferenceLinkers], default=None,
+    parser.add_argument("-coref", "--coreference_linker", choices=[cl.value for cl in CoreferenceLinkers],
                         help="Coreference linker to apply after entity linkers.")
     parser.add_argument("--only_pronouns", action="store_true",
                         help="Only link coreferences that are pronouns.")
