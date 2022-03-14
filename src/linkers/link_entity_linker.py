@@ -1,5 +1,5 @@
 from src.models.entity_mention import EntityMention
-from src.models.wikipedia_article import WikipediaArticle
+from src.models.article import Article
 from src.helpers.entity_database_reader import EntityDatabaseReader
 
 
@@ -13,7 +13,7 @@ class LinkEntityLinker:
     def __init__(self):
         self.mapping = get_mapping()  # entity name -> entity id
 
-    def link_entities(self, article: WikipediaArticle):
+    def link_entities(self, article: Article):
         entity_mentions = []
         for span, target in article.links:
             if target in self.mapping:

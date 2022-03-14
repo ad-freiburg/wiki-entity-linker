@@ -10,7 +10,7 @@ from src.models.entity_database import EntityDatabase
 from src.models.entity_mention import EntityMention
 from src.utils.offset_converter import OffsetConverter
 from src.utils.pronoun_finder import PronounFinder
-from src.models.wikipedia_article import WikipediaArticle
+from src.models.article import Article
 from src import settings
 
 logger = logging.getLogger("main." + __name__.split(".")[-1])
@@ -47,7 +47,7 @@ class LinkTextEntityLinker:
                 if not syn.islower() and syn not in synonym_dict:
                     synonym_dict[syn] = entity_id
 
-    def link_entities(self, article: WikipediaArticle, doc: Optional[Doc] = None):
+    def link_entities(self, article: Article, doc: Optional[Doc] = None):
         if doc is None:
             doc = self.model(article.text)
 
