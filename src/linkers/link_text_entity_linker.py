@@ -17,6 +17,13 @@ logger = logging.getLogger("main." + __name__.split(".")[-1])
 
 
 def is_overlapping_span(covered_positions: Set[int], span: Tuple[int, int]) -> bool:
+    """
+    Check if the given span overlaps with an already linked mention in covered_positions.
+
+    :param covered_positions: Set of character indices in the text that belong to an already linked mention.
+    :param span: Span (start, end) for which to check for overlaps with already linked mentions.
+    :return: Boolean indicating whether the given span overlaps with an already linked mention.
+    """
     for i in range(span[0], span[1]):
         if i in covered_positions:
             return True
@@ -35,7 +42,8 @@ class LinkTextEntityLinker:
         self.entity_db = entity_db
 
     def add_synonyms(self, entity_id: str, synonym_dict: Dict):
-        """Add all aliases of an entity to dictionary
+        """
+        Add all aliases of the given entity to the given synonym dictionary.
         """
         if self.entity_db.contains_entity(entity_id):
             entity = self.entity_db.get_entity(entity_id)
@@ -51,11 +59,11 @@ class LinkTextEntityLinker:
         if doc is None:
             doc = self.model(article.text)
 
-        entity_links = dict()
-        entity_synonyms = dict()
-        covered_positions = set()
-        entity_mentions = []
-        bold_title_spans = []
+        entity_links = dict()  # Mapping from mention text to entity ID for entities that are inferred from a hyperlink
+        entity_synonyms = dict()  # Mapping from synonym to entity ID
+        covered_positions = set()  # Set of character indices in the text that belong to an already linked mention.
+        entity_mentions = []  # List of EntityMentions that are produced by the linker
+        bold_title_spans = []  # List of bold title spans as Tuple (start, end) and the article title
 
         # Link article entity to Wikidata id
         title_entity_id = self.entity_db.link2id(article.title)
