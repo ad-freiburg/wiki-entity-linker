@@ -8,6 +8,9 @@ ANNOTATION_CLASS_UNEVALUATED = "unevaluated";
 RESULTS_EXTENSION = ".results";
 EVALUATION_RESULT_PATH = "evaluation-results";
 
+EXAMPLE_BENCHMARK_PATH = "example-benchmark/error-category-examples.benchmark.jsonl";
+EXAMPLE_BENCHMARK_RESULTS_PATH = "example-benchmark/example.error-category-examples.results";
+
 MAX_SELECTED_APPROACHES = 2;
 MAX_CACHED_FILES = 15;
 
@@ -18,39 +21,40 @@ ignore_headers = ["true_positives", "false_positives", "false_negatives", "groun
 percentage_headers = ["precision", "recall", "f1"];
 copy_latex_text = "Copy LaTeX code for table";
 
+tooltip_example_html = " <a href=\"#example_benchmark_modal\"onclick=\"show_example_benchmark_modal(this)\" data-toggle=\"modal\" data-target=\"#example_benchmark_modal\">For an example click here</a>.";
 header_descriptions = {
     "undetected": {
-        "all": "The span of a GT mention was not linked (= NER FN) (Total: Named GT mentions)",
-        "lowercase": "The span of a lowercase GT mention was not linked (Total: Named lowercase GT mentions)",
-        "partially_included": "FN and a part of the GT mention was linked to an arbitrary entity (Total: Named GT mentions containing whitespace(s))",
-        "partial_overlap": "FN and the GT span overlaps with a predicted span (Total: Named uppercase GT mentions)",
-        "other": "Other detection error (Total: Named uppercase GT mentions)"
+        "all": "The span of a GT mention was not linked (= NER FN) (Total: Named GT mentions).",
+        "lowercase": "The span of a lowercase GT mention was not linked (Total: Named lowercase GT mentions).",
+        "partially_included": "FN and a part of the GT mention was linked to an arbitrary entity (Total: Named GT mentions containing whitespace(s)).",
+        "partial_overlap": "FN and the GT span overlaps with a predicted span (Total: Named uppercase GT mentions).",
+        "other": "Other detection error (Total: Named uppercase GT mentions)."
     },
     "wrong_disambiguation": {
-        "all": "Detected, but wrong entity linked (Total: Detected)",
-        "demonym": "FN from a list of demonyms (German, Germans, ...) (Total: All demonym GT mentions)",
-        "partial_name": "FN and the GT mention is part of the entity name (Total: Named GT mentions where the mention is a part of the entity name)",
-        "metonymy": "Predicted and most popular candidate are locations, but ground truth is not (Total: Most popular candidate is a location, but ground truth is not)",
-        "rare": "Most popular candidate is wrongly predicted (Total: Detected mentions where the most popular candidate is not the correct entity)",
+        "all": "Detected, but wrong entity linked (Total: Detected).",
+        "demonym": "FN from a list of demonyms (German, Germans, ...) (Total: All demonym GT mentions).",
+        "partial_name": "FN and the GT mention is part of the entity name (Total: Named GT mentions where the mention is a part of the entity name).",
+        "metonymy": "Predicted and most popular candidate are locations, but ground truth is not (Total: Most popular candidate is a location, but ground truth is not).",
+        "rare": "Most popular candidate is wrongly predicted (Total: Detected mentions where the most popular candidate is not the correct entity).",
         "other": "Other disambiguation error",
-        "wrong_candidates": "A GT mention was recognized but the GT entity is not among the candidates (Total: Named detected)",
-        "multi_candidates": "A GT mention was recognized and the GT entity is one of the candidates, but the wrong candidate was selected (Total: Named detected where the GT entity is one of multiple candidates)"
+        "wrong_candidates": "A GT mention was recognized but the GT entity is not among the candidates (Total: Named detected).",
+        "multi_candidates": "A GT mention was recognized and the GT entity is one of the candidates, but the wrong candidate was selected (Total: Named detected where the GT entity is one of multiple candidates)."
     },
     "false_detection": {
         "all": "Predicted mention that does not match a groundtruth mention span",
         "abstract_entity": "Lowercase named FP that does not overlap with a GT mention",
         "unknown_entity": "Uppercase mention wrongly linked, where the ground truth is either Unknown or has no label at all",
         "other": "Other false detection",
-        "wrong_span": "Predicted mention whose span does not match, but overlaps with a GT mention with a matching entity (Total: Predicted mentions)"
+        "wrong_span": "Predicted mention whose span does not match, but overlaps with a GT mention with a matching entity (Total: Predicted mentions)."
     },
     "other_errors": {
-        "hyperlink": "FN where the mention is a hyperlink (Total: GT mentions that are hyperlinks)"
+        "hyperlink": "FN where the mention is a hyperlink (Total: GT mentions that are hyperlinks)."
     },
     "wrong_coreference": {
         "false_detection": "FP mentions in {It, it, This, this, That, that, Its, its}",
-        "reference_wrongly_disambiguated": "FN + FP, the reference was wrongly disambiguated (Total: Coreference mentions where correct GT mention was referenced)",
-        "wrong_mention_referenced": "FN + FP, wrong mention was referenced (Total: Linked GT coreference mentions)",
-        "undetected": "FN, mention was not linked (Total: GT coreference mentions)"
+        "reference_wrongly_disambiguated": "FN + FP, the reference was wrongly disambiguated (Total: Coreference mentions where correct GT mention was referenced).",
+        "wrong_mention_referenced": "FN + FP, wrong mention was referenced (Total: Linked GT coreference mentions).",
+        "undetected": "FN, mention was not linked (Total: GT coreference mentions)."
     }
 };
 
@@ -120,12 +124,19 @@ $("document").ready(function() {
 
     $("#checkbox_compare").prop('checked', url_param_compare);
 
+    read_example_benchmark_data();
+
     set_benchmark_select_options();
 
     // Filter results by regex in input field #result-regex (from SPARQL AC evaluation)
     // Filter on key up
     $("input#result-filter").keyup(function() {
         filter_table_rows();
+
+        // Update current URL without refreshing the site
+        const url = new URL(window.location);
+        url.searchParams.set('system_filter', $("input#result-filter").val());
+        window.history.replaceState({}, '', url);
     });
 
     // Highlight error category cells on hover
@@ -167,11 +178,8 @@ $("document").ready(function() {
     });
 
     // Position table tooltips
-    $("#evaluation_table_wrapper").on("mouseenter", "td,th", function() {
-        var tag_name = $(this).prop("tagName").toLowerCase();
-        $(this).find(".tooltip").each(function() {
-            position_table_tooltip(this, tag_name);
-        });
+    $("#evaluation_table_wrapper").on("mouseenter", ".tooltip", function() {
+        position_table_tooltip(this);
     });
 
     // Tooltips need to be repositioned on window resize
@@ -219,6 +227,15 @@ $("document").ready(function() {
         sortRestart: true
     });
 
+    // Update URL on table sort
+    $("#evaluation_table_wrapper table").bind("sortEnd",function() {
+        // Update current URL without refreshing the site
+        var sort_order = $("#evaluation_table_wrapper table")[0].config.sortList;
+        const url = new URL(window.location);
+        url.searchParams.set('sort_order', sort_order.join(","));
+        window.history.replaceState({}, '', url);
+    });
+
     reset_annotation_selection();
     $(document).on("keydown", function(event) {
         if ($("input#result-filter").is(":focus") || $("#benchmark").is(":focus") || $("#article_select").is(":focus")) return;
@@ -230,27 +247,92 @@ $("document").ready(function() {
             }
             if (event.ctrlKey && event.which == 39) {
                 // Jump to next error highlight
-                console.log("indices before jump", jump_to_annotation_index);
                 scroll_to_next_annotation(true);
-                console.log("indices after jump: ", jump_to_annotation_index);
             } else if (event.ctrlKey && event.which == 37) {
-                console.log("indices before jump", jump_to_annotation_index);
                 scroll_to_previous_annotation(true);
-                console.log("indices after jump: ", jump_to_annotation_index);
             } else if (event.which == 39) {
                 // Jump to next highlight
-                console.log("indices before jump", jump_to_annotation_index);
                 scroll_to_next_annotation(false);
-                console.log("indices after jump: ", jump_to_annotation_index);
             } else if (event.which == 37) {
                 // Jump to previous highlight
-                console.log("indices before jump", jump_to_annotation_index);
                 scroll_to_previous_annotation(false);
-                console.log("indices after jump: ", jump_to_annotation_index);
             }
         }
     });
 });
+
+function get_type_label(qid) {
+    var qid_lower = qid.toLowerCase();
+    if (qid_lower in type_name_mapping) {
+        return type_name_mapping[qid_lower];
+    }
+    return qid + " (label missing)";
+}
+
+function read_example_benchmark_data() {
+    var filename = EXAMPLE_BENCHMARK_RESULTS_PATH.substring(0, EXAMPLE_BENCHMARK_RESULTS_PATH.length - RESULTS_EXTENSION.length);
+    var articles_path = filename + ".jsonl";
+    var cases_path = filename + ".cases";
+
+    articles_example_benchmark = [];
+    $.get(EXAMPLE_BENCHMARK_PATH, function(data) {
+        lines = data.split("\n");
+        for (line of lines) {
+            if (line.length > 0) {
+                articles_example_benchmark.push(JSON.parse(line));
+            }
+        }
+    });
+
+    articles_data_example_benchmark = [];
+    evaluation_cases_example_benchmark = [];
+    var promise = $.get(articles_path, function(data) {
+        lines = data.split("\n");
+        for (line of lines) {
+            if (line.length > 0) {
+                articles_data_example_benchmark.push(JSON.parse(line));
+            }
+        }
+    }).then(function() {
+        $.get(cases_path, function(data) {
+            lines = data.split("\n");
+            for (line of lines) {
+                if (line.length > 0) {
+                    evaluation_cases_example_benchmark.push(JSON.parse(line));
+                }
+            }
+        });
+    });
+}
+
+function show_example_benchmark_modal(el) {
+    /*
+    Open the example benchmark model and show the example article that corresponds
+    to the error category of the clicked table header tooltip.
+    */
+    // Get example error category of the table tooltip to highlight only corresponding mentions
+    var selected_category = get_error_category_or_type($(el).closest("th")[0]);
+
+    // Get table header title
+    var table_header_cell = $(el).closest("th")[0];
+    var classes = $(table_header_cell).attr('class').split(/\s+/);
+    var error_category_title = classes[1].replace(/_/g, " ").replace("-", " - ");
+
+    // Determine article index of selected example
+    var article_index = 0;
+    for (var i=0; i<articles_example_benchmark.length; i++) {
+        var article = articles_example_benchmark[i];
+        if (article.title.toLowerCase().includes(error_category_title)) {
+            article_index = i;
+            break;
+        }
+    }
+
+    // Display annotated text
+    var textfield = $("#example_prediction_overview tr td");
+    show_annotated_text("example_annotations", $(textfield[0]), selected_category, 100, article_index, true);
+    $("#example_prediction_overview tr th").text(articles_example_benchmark[article_index].title);
+}
 
 function scroll_to_next_annotation(only_errors) {
     /*
@@ -265,7 +347,6 @@ function scroll_to_next_annotation(only_errors) {
             if (only_errors) {
                 next_annotation_index[i] = find_next_annotation_index(i);
                 if (next_annotation_index[i] < all_highlighted_annotations[i].length) next_annotations[i] = all_highlighted_annotations[i][next_annotation_index[i]];
-                console.log("next_annotation_index", next_annotation_index[i], next_annotations[i]);
             } else {
                 next_annotation_index[i] = jump_to_annotation_index[i] + 1;
                 next_annotations[i] = all_highlighted_annotations[i][next_annotation_index[i]];
@@ -320,12 +401,10 @@ function bring_jump_index_to_same_height(next_annotation, side_index) {
         }
     }
     jump_to_annotation_index[side_index]--; // Minus one, because the next annotation should be the one determined above
-    console.log("Next index on " + side_index + " side is ", jump_to_annotation_index[side_index]);
 }
 
 function scroll_to_previous_annotation(only_errors) {
     // Get potential next highlighted annotation for left and right side
-    console.log("last highlighted side: ", last_highlighted_side);
     var next_annotation_index = [-1, -1];
     var next_annotations = [null, null];
     for (var i=0; i<2; i++) {
@@ -334,7 +413,6 @@ function scroll_to_previous_annotation(only_errors) {
             if (only_errors) {
                 next_annotation_index[i] = find_previous_annotation_index(i, last_highlighted_side);
                 if (next_annotation_index[i] >= 0) next_annotations[i] = all_highlighted_annotations[i][next_annotation_index[i]];
-                console.log("next_annotation_index", next_annotation_index[i], next_annotations[i]);
             } else {
                 next_annotation_index[i] = jump_to_annotation_index[i] - (last_highlighted_side==i);
                 next_annotations[i] = all_highlighted_annotations[i][next_annotation_index[i]];
@@ -345,48 +423,39 @@ function scroll_to_previous_annotation(only_errors) {
     var next_annotation;
     if (next_annotations[0] && next_annotations[1]) {
         if ($(next_annotations[0]).offset().top > $(next_annotations[1]).offset().top) {
-            console.log("1. case");
             next_annotation = next_annotations[0];
             if (!only_errors || last_highlighted_side == 0) jump_to_annotation_index[last_highlighted_side] = next_annotation_index[last_highlighted_side];
             else {
                 update_index_to_previous_annotation(next_annotation, last_highlighted_side);
                 jump_to_annotation_index[Math.abs(last_highlighted_side - 1)] = next_annotation_index[Math.abs(last_highlighted_side - 1)];
-                console.log("Index on side " + Math.abs(last_highlighted_side - 1) + "set to " + next_annotation_index[Math.abs(last_highlighted_side - 1)]);
             }
             last_highlighted_side = 0;
         } else {
-            console.log("2. case");
             next_annotation = next_annotations[1];
             if (!only_errors || last_highlighted_side == 1) jump_to_annotation_index[last_highlighted_side] = next_annotation_index[last_highlighted_side];
             else {
                 update_index_to_previous_annotation(next_annotation, last_highlighted_side);
                 jump_to_annotation_index[Math.abs(last_highlighted_side - 1)] = next_annotation_index[Math.abs(last_highlighted_side - 1)];
-                console.log("Index on side " + Math.abs(last_highlighted_side - 1) + "set to " + next_annotation_index[Math.abs(last_highlighted_side - 1)]);
             }
             last_highlighted_side = 1;
         }
     } else if (next_annotations[0]) {
-        console.log("3. case");
         next_annotation = next_annotations[0];
         if (!only_errors || last_highlighted_side == 0) jump_to_annotation_index[last_highlighted_side] = next_annotation_index[last_highlighted_side];
         else {
             update_index_to_previous_annotation(next_annotation, last_highlighted_side);
             jump_to_annotation_index[Math.abs(last_highlighted_side - 1)] = next_annotation_index[Math.abs(last_highlighted_side - 1)];
-            console.log("Index on side " + Math.abs(last_highlighted_side - 1) + "set to " + next_annotation_index[Math.abs(last_highlighted_side - 1)]);
         }
         last_highlighted_side = 0;
     } else if (next_annotations[1]) {
-        console.log("4. case");
         next_annotation = next_annotations[1];
         if (!only_errors || last_highlighted_side == 1) jump_to_annotation_index[last_highlighted_side] = next_annotation_index[last_highlighted_side];
         else {
             update_index_to_previous_annotation(next_annotation, last_highlighted_side);
             jump_to_annotation_index[Math.abs(last_highlighted_side - 1)] = next_annotation_index[Math.abs(last_highlighted_side - 1)];
-            console.log("Index on side " + Math.abs(last_highlighted_side - 1) + "set to " + next_annotation_index[Math.abs(last_highlighted_side - 1)]);
         }
         last_highlighted_side = 1;
     } else if (!only_errors) {
-        console.log("5. case");
         jump_to_annotation_index[0] = -1;
         jump_to_annotation_index[1] = -1;
     }
@@ -410,7 +479,6 @@ function update_index_to_previous_annotation(next_annotation, side_index) {
             jump_to_annotation_index[side_index]--;
         }
     }
-    console.log("Next index on " + side_index + " side is ", jump_to_annotation_index[side_index]);
 }
 
 function find_next_annotation_index(side_index) {
@@ -474,6 +542,7 @@ function read_url_parameters() {
     url_param_emphasis = get_url_parameter_array(get_url_parameter("emphasis"), false);
     url_param_show_columns = get_url_parameter_array(get_url_parameter("show_columns"), false);
     url_param_sort_order = get_url_parameter_array(get_url_parameter("sort_order"), true);
+    url_param_access = get_url_parameter_string(get_url_parameter("access"));
 }
 
 function get_url_parameter_boolean(url_parameter) {
@@ -508,106 +577,14 @@ function is_string(object) {
     return typeof object === 'string' || object instanceof String;
 }
 
-function generate_and_show_url() {
-    /*
-    Generate a URL for the current view and display it in the generate URL button tooltip.
-    */
-    var url = $(location).attr('host') + $(location).attr('pathname');
-
-    param_names = [];
-    param_values = [];
-
-    // Get system_filter URL parameter
-    param_names.push("system_filter");
-    param_values.push($("input#result-filter").val());
-    // Get show_deprecated URL parameter
-    param_names.push("show_deprecated");
-    param_values.push(+ $("#checkbox_deprecated").is(":checked"));
-    // Get compare URL parameter
-    param_names.push("compare");
-    param_values.push(+$("#checkbox_compare").is(":checked"));
-    // Get benchmark URL parameter
-    param_names.push("benchmark");
-    param_values.push($("#benchmark option:selected").text());
-    // Get article URL parameter
-    param_names.push("article");
-    param_values.push($("#article_select option:selected").text());
-    // Get system URL parameter
-    if (selected_approach_names.length > 0) {
-        param_names.push("system");
-        param_values.push(selected_approach_names.join(","));
-    }
-    // Get emphasis URL parameter
-    if (selected_cells.length > 0) {
-        param_names.push("emphasis");
-        param_values.push(selected_cells.map(function(el) {return ($(el).attr('class')) ? $(el).attr('class').split(/\s+/)[1] : []}).join(","));
-    }
-    // Get show_columns URL parameter
-    var checkbox_classes = [];
-    var checkboxes = $("#evaluation_overview .checkboxes input:checked").each(function() {
-        checkbox_classes.push($(this).attr("class").split(/\s+/)[0].replace("checkbox_", ""));
-    });
-    param_names.push("show_columns");
-    param_values.push(checkbox_classes.join(","));
-    // Get sort_order URL parameter
-    var sort_order = $("#evaluation_table_wrapper table")[0].config.sortList;
-    param_names.push("sort_order");
-    param_values.push(sort_order.join(","));
-
-    // Put all together and append to URL
-    param_values = param_values.map(function(el) { return encodeURIComponent(el); });
-    url += "?";
-    url += param_names.map(function(_, i) {return param_names[i] + "=" + param_values[i]}).join("&");
-
-    // Show URL in tooltip
-    $("#generate_url .tooltiptext").text(url);
-}
-
-function copy_generated_url() {
-    /*
-    Copy the URL contained in the tooltip.
-    */
-    // Don't copy the URL again if the copy success message is still displayed
-    // Otherwise the string "Copied" will be included in the copied text
-    if ($("#copy_success").length > 0) return;
-
-    // Select the tooltip text
-    window.getSelection().selectAllChildren($("#generate_url .tooltiptext")[0]);
-
-    // Use of document.execCommand is discouraged, but the alternative, navigator.clipboard, is undefined for
-    // insecure http connections. See
-    // https://stackoverflow.com/questions/22581345/click-button-copy-to-clipboard
-    document.execCommand("copy");
-
-    // Show an overlay over the generated URL for one second, indicating that the URL was copied
-    $("#generate_url .tooltiptext").text()
-    $("<div id=\"copy_success\"><b>Copied</b></div>").css({
-        position: "absolute",
-        color: "white",
-        width: "100%",
-        height: "100%",
-        left: 0,
-        top: 0,
-        zIndex: 40,
-        fontSize: "200%",
-        background: "rgba(211,211,211,0.8)",
-        margin: "auto",
-        textAlign: "center",
-        display: "flex",
-        justifyContent: "center",
-        alignContent: "center",
-        flexDirection: "column"
-    }).appendTo($("#generate_url .tooltiptext"));
-    setTimeout(function() { $("#copy_success").remove(); }, 1 * 1000);
-}
-
-function position_table_tooltip(anchor_el, tag_name) {
+function position_table_tooltip(anchor_el) {
+    var tag_name = $(anchor_el).prop("tagName").toLowerCase();
     var anchor_el_rect = anchor_el.getBoundingClientRect();
     $(anchor_el).find(".tooltiptext").each(function() {
         var tooltip_rect = this.getBoundingClientRect();
         var font_size = $(this).css("font-size").replace("px", "");
         if (tag_name =="th") {
-            var top = anchor_el_rect.bottom + 10;
+            var top = anchor_el_rect.bottom;
         } else {
             var top = anchor_el_rect.top - tooltip_rect.height - (font_size / 2);
         }
@@ -646,7 +623,8 @@ function get_url_parameter(parameter_name) {
     for (var i = 0; i < url_variables.length; i++) {
         var curr_parameter = url_variables[i].split('=');
         if (curr_parameter[0] === parameter_name) {
-            return curr_parameter[1] === undefined ? true : decodeURIComponent(curr_parameter[1]);
+            // "+" should be decoded as whitespace
+            return curr_parameter[1] === undefined ? true : decodeURIComponent((curr_parameter[1]+'').replace(/\+/g, '%20'));
         }
     }
     return false;
@@ -680,7 +658,7 @@ function set_benchmark_select_options() {
     $.get("benchmarks", function(folder_data) {
         $(folder_data).find("a").each(function() {
             file_name = $(this).attr("href");
-            if (file_name.startsWith("benchmark_labels")) {
+            if (file_name.endsWith(".benchmark.jsonl")) {
                 benchmarks.push(file_name);
             }
         });
@@ -689,7 +667,7 @@ function set_benchmark_select_options() {
         for (bi in benchmarks) {
             benchmark = benchmarks[bi];
             var option = document.createElement("option");
-            option.text = benchmark.split("_")[2].split(".")[0];
+            option.text = benchmark.replace(/(.*)\.benchmark\.jsonl/, "$1");
             option.value = benchmark;
             benchmark_select.add(option);
         }
@@ -726,6 +704,13 @@ function show_benchmark_results(initial_call) {
 
     if (benchmark_file == "") {
         return;
+    }
+
+    if (!initial_call) {
+        // Update current URL without refreshing the site
+        const url = new URL(window.location);
+        url.searchParams.set('benchmark', benchmark_name);
+        window.history.replaceState({}, '', url);
     }
 
     // Remove previous evaluation table content
@@ -789,12 +774,15 @@ function parse_benchmark(benchmark_file, initial_call) {
     Read the articles and ground truth labels from the benchmark.
 
     Reads the file benchmarks/<benchmark_file> and adds each article to the list 'articles'.
-    Each article is an object indentical to the parsed JSON-object.
+    Each article is an object identical to the parsed JSON-object.
 
     Calls set_article_select_options(), which sets the options for the article selector element.
     */
     // List of articles with ground truth information from the benchmark.
     articles = [];
+    if (benchmark_file.startsWith("aida") && url_param_access != "42") {
+        benchmark_file = benchmark_file + ".obscured";
+    }
     $.get("benchmarks/" + benchmark_file,
         function(data, status) {
             lines = data.split("\n");
@@ -821,7 +809,9 @@ function set_article_select_options(initial_call) {
 
     // Add default "All articles" option
     var option = document.createElement("option");
-    option.text = "All " + articles.length + " articles (evaluated span only)";
+    var selected_benchmark = $("#benchmark option:selected").text();
+    var option_text_suffix = (["newscrawl", "wiki-ex"].includes(selected_benchmark)) ? " (evaluated span only)" : "";
+    option.text = "All " + articles.length + " articles" + option_text_suffix;
     option.value = -1;
     article_select.add(option);
 
@@ -891,31 +881,33 @@ function is_optional_case(eval_case) {
                                            ["QUANTITY", "DATETIME"].includes(eval_case.true_entity.type));
 }
 
-function show_annotated_text(approach_name, textfield, selected_cell_category, column_idx) {
+function show_annotated_text(approach_name, textfield, selected_cell_category, column_idx, article_index, example_benchmark) {
     /*
     Generate annotations and tooltips for predicted and groundtruth mentions of the selected approach and article
     and show them in the textfield.
     */
-    if (show_all_articles_flag) {
+    var benchmark_articles = (example_benchmark) ? articles_example_benchmark : articles;
+    if (show_all_articles_flag && !example_benchmark) {
         var annotated_texts = [];
-        for (var i=0; i < articles.length; i++) {
-            var annotations = get_annotations(i, approach_name, column_idx);
-            annotated_texts.push(annotate_text(articles[i].text, annotations, articles[i].links, articles[i].evaluation_span, selected_cell_category));
+        for (var i=0; i < benchmark_articles.length; i++) {
+            var annotations = get_annotations(i, approach_name, column_idx, example_benchmark);
+            annotated_texts.push(annotate_text(benchmark_articles[i].text, annotations, benchmark_articles[i].hyperlinks, benchmark_articles[i].evaluation_span, selected_cell_category));
         }
         annotated_text = "";
         for (var i=0; i < annotated_texts.length; i++) {
             if (i != 0) annotated_text += "<hr/>";
-            if (articles[i].title) annotated_text += "<b>" + articles[i].title + "</b><br>";
+            if (benchmark_articles[i].title) annotated_text += "<b>" + benchmark_articles[i].title + "</b><br>";
             annotated_text += annotated_texts[i];
         }
     } else {
-        var annotations = get_annotations(selected_article_index, approach_name, column_idx);
-        var annotated_text = annotate_text(article.text, annotations, article.links, [0, article.text.length], selected_cell_category);
+        var curr_article = benchmark_articles[article_index];
+        var annotations = get_annotations(article_index, approach_name, column_idx, example_benchmark);
+        var annotated_text = annotate_text(curr_article.text, annotations, curr_article.hyperlinks, [0, curr_article.text.length], selected_cell_category);
     }
     textfield.html(annotated_text);
 }
 
-function get_annotations(article_index, approach_name, column_idx) {
+function get_annotations(article_index, approach_name, column_idx, example_benchmark) {
     /*
     Generate annotations for the predicted entities of the selected approach and article.
 
@@ -923,8 +915,13 @@ function get_annotations(article_index, approach_name, column_idx) {
     with the evaluated predictions inside the evaluation span (from the file <approach>.cases),
     and then generates annotations for all of them.
     */
-    var article_cases = evaluation_cases[approach_name][article_index];  // information from the .cases file
-    var article_data = articles_data[approach_name][article_index];  // information from the .jsonl file
+    if (example_benchmark) {
+        var article_cases = evaluation_cases_example_benchmark[article_index];  // information from the .cases file
+        var article_data = articles_data_example_benchmark[article_index];  // information from the .jsonl file
+    } else {
+        var article_cases = evaluation_cases[approach_name][article_index];  // information from the .cases file
+        var article_data = articles_data[approach_name][article_index];  // information from the .jsonl file
+    }
 
     var child_label_to_parent = {};
     var label_id_to_label = {};
@@ -946,19 +943,24 @@ function get_annotations(article_index, approach_name, column_idx) {
     var mentions = [];
 
     // get the mentions before the evaluation span
-    for (prediction of article_data.entity_mentions) {
-        if (prediction.span[1] < evaluation_begin) {
-            mentions.push(prediction);
+    if ("entity_mentions" in article_data) {
+        for (prediction of article_data.entity_mentions) {
+            if (prediction.span[1] < evaluation_begin) {
+                mentions.push(prediction);
+            }
         }
     }
+
     // get the cases inside the evaluation span from the cases list
     for (eval_case of article_cases) {
         mentions.push(eval_case);
     }
     // get the mentions after the evaluation span
-    for (prediction of article_data.entity_mentions) {
-        if (prediction.span[0] >= evaluation_end) {
-            mentions.push(prediction);
+    if ("entity_mentions" in article_data) {
+        for (prediction of article_data.entity_mentions) {
+            if (prediction.span[0] >= evaluation_end) {
+                mentions.push(prediction);
+            }
         }
     }
 
@@ -1041,7 +1043,8 @@ function get_annotations(article_index, approach_name, column_idx) {
                 // Get text of parent span
                 if (curr_label_id != mention.true_entity.id) {
                     var parent_span = label_id_to_label[curr_label_id].span;
-                    gt_annotation.parent_text = articles[article_index].text.substring(parent_span[0], parent_span[1]);
+                    var benchmark_articles = (example_benchmark) ? articles_example_benchmark : articles;
+                    gt_annotation.parent_text = benchmark_articles[article_index].text.substring(parent_span[0], parent_span[1]);
                 }
                 gt_annotation.gt_entity_id = mention.true_entity.entity_id;
                 gt_annotation.gt_entity_name = mention.true_entity.name;
@@ -1116,20 +1119,20 @@ function copy(object) {
     return JSON.parse(JSON.stringify(object));
 }
 
-function annotate_text(text, annotations, links, evaluation_span, selected_cell_category) {
+function annotate_text(text, annotations, hyperlinks, evaluation_span, selected_cell_category) {
     /*
-    Generate tooltips for the given annotations and hyperlinks for the given links.
+    Generate tooltips for the given annotations and html hyperlinks for the given hyperlinks.
     Tooltips and hyperlinks can overlap.
 
     Arguments:
     - text: The original text without tooltips or hyperlinks.
     - annotations: A sorted (by span) list of objects containing tooltip information
-    - links: A sorted (by span) list of tuples (span, target_article)
+    - hyperlinks: A sorted (by span) list of tuples (span, target_article)
     - evaluation_span: The span of the article that can be evaluated
     - selected_cell_categories: categories of the selected cell for the corresponding approach
 
-    First the overlapping annotations and links get combined to combined_annotations.
-    Second, the annotations with links are added to the text and a tooltip is generated for each annotation.
+    First the overlapping annotations and hyperlinks get combined to combined_annotations.
+    Second, the annotations with hyperlinks are added to the text and a tooltip is generated for each annotation.
     */
     // Separate mention annotations into two distinct lists such that any one list does not contain annotations that
     // overlap.
@@ -1145,22 +1148,24 @@ function annotate_text(text, annotations, links, evaluation_span, selected_cell_
     }
 
     // Transform hyperlinks into a similar format as the mention annotations
-    var new_links = [];
-    for (link of links) { new_links.push([copy(link[0]), {"span": link[0], "link": link[1]}]); }
+    var new_hyperlinks = [];
+    if (hyperlinks) {
+        for (link of hyperlinks) { new_hyperlinks.push([copy(link[0]), {"span": link[0], "hyperlink": link[1]}]); }
+    }
 
-    // STEP 1: Combine overlapping annotations and links.
+    // STEP 1: Combine overlapping annotations and hyperlinks.
     // Consumes the first element from the link list or annotation list, or a part from both if they overlap.
     var combined_annotations = combine_overlapping_annotations(only_groundtruth_annotations, non_groundtruth_annotations);
     // Links must be the last list that is added such that they can only be the inner most annotations, because <div>
     // tags are not allowed within <a> tags, but the other way round is valid.
-    combined_annotations = combine_overlapping_annotations(combined_annotations, new_links);
+    combined_annotations = combine_overlapping_annotations(combined_annotations, new_hyperlinks);
 
     // Text should only be the text within the given evaluation span (Careful: This is the entire article if a
     // single article is supposed to be shown and the article evaluation span if all articles are supposed to be
     // shown)
     text = text.substring(0, evaluation_span[1]);
 
-    // STEP 2: Add the combined annotations and links to the text.
+    // STEP 2: Add the combined annotations and hyperlinks to the text.
     // This is done in reverse order so that the text before is always unchanged. This allows to use the spans as given.
     for (annotation of combined_annotations.reverse()) {
         span = annotation[0];
@@ -1185,7 +1190,7 @@ function annotate_text(text, annotations, links, evaluation_span, selected_cell_
 function generate_annotation_html(snippet, annotation, selected_cell_category, parent_text) {
     /*
     Generate html snippet for a given annotation. A hyperlink is also regarded as an annotation
-    and can be identified by the property "link". Inner annotations, e.g. hyperlinks contained in
+    and can be identified by the property "hyperlink". Inner annotations, e.g. hyperlinks contained in
     a mention annotation, nested mention annotations are contained given by the property "inner_annotation".
     */
     var inner_annotation = snippet;
@@ -1194,8 +1199,8 @@ function generate_annotation_html(snippet, annotation, selected_cell_category, p
         inner_annotation = generate_annotation_html(snippet, annotation.inner_annotation, selected_cell_category, annotation.parent_text);
     }
 
-    if ("link" in annotation) {
-        return "<a href=\"https://en.wikipedia.org/wiki/" + annotation.link + "\" target=\"_blank\">" + inner_annotation + "</a>";
+    if ("hyperlink" in annotation) {
+        return "<a href=\"https://en.wikipedia.org/wiki/" + annotation.hyperlink + "\" target=\"_blank\">" + inner_annotation + "</a>";
     }
 
     // Add tooltip
@@ -1242,7 +1247,11 @@ function generate_annotation_html(snippet, annotation, selected_cell_category, p
                 tooltip_header_text += "Groundtruth: " + entity_name + " (" + entity_link + ")";
             }
             if (annotation.class == ANNOTATION_CLASS_OPTIONAL) tooltip_body_text += "Note: Detection is optional<br>";
-            if (annotation.class == ANNOTATION_CLASS_UNKNOWN) tooltip_body_text += "Note: Entity not found in the knowledge base<br>"
+            if (annotation.class == ANNOTATION_CLASS_UNKNOWN) tooltip_body_text += "Note: Entity not found in the knowledge base<br>";
+            if (![ANNOTATION_CLASS_OPTIONAL, ANNOTATION_CLASS_UNKNOWN].includes(annotation.class) && annotation.gt_entity_type) {
+                var type_string = $.map(annotation.gt_entity_type.split("|"), function(qid){ return get_type_label(qid) }).join(", ");
+                tooltip_body_text += "Types: " + type_string + "<br>";
+            }
             tooltip_classes += " below";
         }
     }
@@ -1253,12 +1262,12 @@ function generate_annotation_html(snippet, annotation, selected_cell_category, p
         }
         tooltip_classes += " " + annotation.class;
     }
-    if (annotation.predicted_by) {
-        tooltip_body_text += "Predicted by " + annotation.predicted_by + "<br>";
+    if (annotation.predicted_by) tooltip_body_text += "Predicted by " + annotation.predicted_by + "<br>";
+    if (annotation.pred_entity_type) {
+        var type_string = $.map(annotation.pred_entity_type.split("|"), function(qid){ return get_type_label(qid) }).join(", ");
+        tooltip_body_text += "Types: " + type_string + "<br>";
     }
-    if (annotation.parent_text) {
-        tooltip_body_text += "Alternative span: \"" + annotation.parent_text + "\"<br>";
-    }
+    if (annotation.parent_text) tooltip_body_text += "Alternative span: \"" + annotation.parent_text + "\"<br>";
     // Add error category tags
     // Only show error category tags for once in the FP tooltip, i.e. don't double them in the GT tooltip for TP
     // and for disambiguation errors
@@ -1445,7 +1454,7 @@ async function show_article(selected_approaches, timestamp) {
 
     // Show columns
     // Show first prediction column
-    show_annotated_text(selected_approaches[0], $(columns[column_idx]), selected_cell_categories[0], column_idx);
+    show_annotated_text(selected_approaches[0], $(columns[column_idx]), selected_cell_categories[0], column_idx, selected_article_index, false);
     var benchmark_name = $("#benchmark option:selected").text();
     var emphasis_str = get_emphasis_string(selected_cell_categories[0])
     $(column_headers[column_idx]).html(selected_approaches[0] + "<span class='nonbold'> on " + benchmark_name + emphasis_str + "</span>");
@@ -1453,7 +1462,7 @@ async function show_article(selected_approaches, timestamp) {
     column_idx++;
     if(is_compare_checked() && selected_approaches.length > 1) {
         // Show second prediction column
-        show_annotated_text(selected_approaches[1], $(columns[column_idx]), selected_cell_categories[1], column_idx);
+        show_annotated_text(selected_approaches[1], $(columns[column_idx]), selected_cell_categories[1], column_idx, selected_article_index, false);
         emphasis_str = get_emphasis_string(selected_cell_categories[1])
         $(column_headers[column_idx]).html(selected_approaches[1] + "<span class='nonbold'> on " + benchmark_name + emphasis_str + "</span>");
         show_table_column("prediction_overview", column_idx);
@@ -1588,7 +1597,7 @@ function build_overview_table(benchmark_name, default_selected_systems, default_
                 // Remove the table loading GIF
                 $("#table_loading").removeClass("show");
 
-                if (initial_call) {
+                if (initial_call && url_param_sort_order.length > 0) {
                     // Use sort order from URL parameter
                     $.tablesorter.sortOn( $("#evaluation_table_wrapper table")[0].config, [ url_param_sort_order ]);
                 }
@@ -1631,8 +1640,8 @@ function add_checkboxes(json_obj, initial_call) {
                 var class_name = get_class_name(subkey);
                 var title = get_title_from_key(subkey);
                 var checked = (url_param_show_columns.includes(class_name)) ? "checked" : ""
-                var checkbox_html = "<input type=\"checkbox\" class=\"checkbox_" + class_name + "\" onchange=\"show_hide_columns(this, true)\" " + checked + ">";
-                checkbox_html += "<label>" + title + "</label>";
+                var checkbox_html = "<span><input type=\"checkbox\" class=\"checkbox_" + class_name + "\" onchange=\"on_column_checkbox_change(this, true)\" " + checked + ">";
+                checkbox_html += "<label>" + title + "</label></span>\n";
                 var checkbox_div_id = (key == "errors") ? "error_checkboxes" : "type_checkboxes";
                 $("#" + checkbox_div_id + ".checkboxes").append(checkbox_html);
                 if (key == "by_type") type_name_mapping[get_type_qid(subkey).toLowerCase()] = title;
@@ -1641,11 +1650,24 @@ function add_checkboxes(json_obj, initial_call) {
             var class_name = get_class_name(key);
             var title = get_title_from_key(key);
             var checked = ((class_name == "all" && url_param_show_columns.length == 0) || url_param_show_columns.includes(class_name)) ? "checked" : ""
-            var checkbox_html = "<input type=\"checkbox\" class=\"checkbox_" + class_name + "\" onchange=\"show_hide_columns(this, true)\" " + checked + ">";
-            checkbox_html += "<label>" + title + "</label>";
+            var checkbox_html = "<span><input type=\"checkbox\" class=\"checkbox_" + class_name + "\" onchange=\"on_column_checkbox_change(this, true)\" " + checked + ">";
+            checkbox_html += "<label>" + title + "</label></span>\n";
             $("#general_checkboxes.checkboxes").append(checkbox_html);
         }
     });
+}
+
+function on_column_checkbox_change(element, resize) {
+    show_hide_columns(element, resize);
+
+    // Update current URL without refreshing the site
+    var checkbox_classes = [];
+    var checkboxes = $("#evaluation_overview .checkboxes input:checked").each(function() {
+        checkbox_classes.push($(this).attr("class").split(/\s+/)[0].replace("checkbox_", ""));
+    });
+    const url = new URL(window.location);
+    url.searchParams.set('show_columns', checkbox_classes.join(","));
+    window.history.replaceState({}, '', url);
 }
 
 function show_hide_columns(element, resize) {
@@ -1702,21 +1724,19 @@ function get_table_header_by_json_key(json_obj, key) {
         if (!(ignore_headers.includes(subkey))) {
             var subclass_name = get_class_name(subkey);
             var sort_order = (key in error_category_mapping) ? " data-sortinitialorder=\"asc\"" : "";
-            second_row_addition += "<th class='" + class_name + " " + class_name + "_" + subclass_name + " sorter-digit'" + sort_order + "><div class='tooltip'>" + get_title_from_key(subkey);
+            second_row_addition += "<th class='" + class_name + " " + class_name + "-" + subclass_name + " tooltip sorter-digit'" + sort_order + ">" + get_title_from_key(subkey);
             var tooltip_text = get_header_tooltip_text(key, subkey);
-            if (tooltip_text) {
-                second_row_addition += "<span class='tooltiptext'>" + tooltip_text + "</span>";
-            }
-            second_row_addition += "</div></th>";
+            if (tooltip_text) second_row_addition += "<span class='tooltiptext'>" + tooltip_text + "</span>";
+            second_row_addition += "</th>";
             colspan += 1;
         }
     });
-    first_row_addition += "<th colspan=\"" + colspan + "\" class='" + class_name + "'><div class='tooltip'>" + get_title_from_key(key);
+    first_row_addition += "<th colspan=\"" + colspan + "\" class='" + class_name + " tooltip'>" + get_title_from_key(key);
     var tooltip_text = get_header_tooltip_text(key, null);
     if (tooltip_text) {
         first_row_addition += "<span class='tooltiptext'>" + tooltip_text + "</span>";
     }
-    first_row_addition += "</div></th>";
+    first_row_addition += "</th>";
     return [first_row_addition, second_row_addition];
 }
 
@@ -1769,7 +1789,7 @@ function get_table_row_by_json_key(json_obj, key, onclick_str) {
                 processed_value += "<span class='tooltiptext'>" + get_tooltip_text(json_obj[key]) + "</span></div>";
                 value = processed_value;
             } else {
-                Math.round(json_obj[key][subkey] * 100) / 100
+                Math.round(json_obj[key][subkey] * 100) / 100;
             }
             var subclass_name = get_class_name(subkey);
             var data_string = "data-category='" + class_name + "," + subclass_name + "'";
@@ -1797,7 +1817,11 @@ function get_tooltip_text(json_obj) {
 function get_header_tooltip_text(key, subkey) {
     if (key in header_descriptions) {
         if (subkey) {
-            return header_descriptions[key][subkey];
+            var tooltip_text = header_descriptions[key][subkey];
+            if (subkey != "all") {
+                tooltip_text += tooltip_example_html;
+            }
+            return tooltip_text;
         }
         if (typeof header_descriptions[key] == "string") {
             return header_descriptions[key];
@@ -1945,6 +1969,11 @@ function on_row_click(el) {
     }
     var selected_approaches = [...selected_approach_names];
 
+    // Update current URL without refreshing the site
+    const url = new URL(window.location);
+    url.searchParams.set('system', selected_approach_names.join(","));
+    window.history.replaceState({}, '', url);
+
     read_evaluation(approach_name, selected_approaches, timestamp);
 }
 
@@ -2007,6 +2036,11 @@ function on_cell_click(el) {
     // Note that selected_rows is updated in on_row_click(), i.e. after on_cell_click() is called so no -1 necessary.
     approach_index = (already_selected_row_clicked >= 0 || !is_compare_checked()) ? 0 : selected_rows.length % MAX_SELECTED_APPROACHES;
     selected_cell_categories[approach_index] = get_error_category_or_type(el);
+
+    // Update current URL without refreshing the site
+    const url = new URL(window.location);
+    url.searchParams.set('emphasis', selected_cells.map(function(el) {return ($(el).attr('class')) ? $(el).attr('class').split(/\s+/)[1] : []}).join(","));
+    window.history.replaceState({}, '', url);
 }
 
 function deselect_all_table_rows() {
@@ -2088,6 +2122,7 @@ function toggle_compare() {
             deselected_row = selected_rows.shift();  // Remove first element in array
             $(deselected_row).removeClass("selected");
             deselected_cell = selected_cells.shift();
+            selected_cell_categories = [selected_cell_categories[1], null];
             if (deselected_cell) remove_selected_classes(deselected_cell);
         }
 
@@ -2095,16 +2130,36 @@ function toggle_compare() {
 
         show_article(selected_approach_names, timestamp);
     }
+    // Update current URL without refreshing the site
+    const url = new URL(window.location);
+    url.searchParams.set('compare', $("#checkbox_compare").is(":checked"));
+    url.searchParams.set('system', selected_approach_names.join(","));
+    url.searchParams.set('emphasis', selected_cells.map(function(el) {return ($(el).attr('class')) ? $(el).attr('class').split(/\s+/)[1] : []}).join(","));
+    window.history.replaceState({}, '', url);
 }
 
 function is_compare_checked() {
     return $("#checkbox_compare").is(":checked");
 }
 
+function toggle_show_deprecated() {
+    filter_table_rows();
+
+    // Update current URL without refreshing the site
+    const url = new URL(window.location);
+    url.searchParams.set('show_deprecated', $("#checkbox_deprecated").is(":checked"));
+    window.history.replaceState({}, '', url);
+}
+
 function on_article_select() {
     var timestamp = new Date().getTime();
     last_show_article_request_timestamp = timestamp;
     show_article(selected_approach_names, timestamp);
+
+    // Update current URL without refreshing the site
+    const url = new URL(window.location);
+    url.searchParams.set('article', $("#article_select option:selected").text());
+    window.history.replaceState({}, '', url);
 }
 
 function produce_latex() {

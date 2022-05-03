@@ -34,11 +34,11 @@ NEWSCRAWL_TEST_ARTICLES = DATA_DIRECTORY + "articles/newscrawl/test.jsonl"
 
 
 # Wikidata mappings
-WIKIDATA_ENTITIES_FILE = DATA_DIRECTORY + "wikidata_mappings/wikidata_entities.tsv"
-QID_TO_ABSTRACTS_FILE = DATA_DIRECTORY + "wikidata_mappings/qid_to_wikipedia_abstract.tsv"
+QID_TO_ABSTRACTS_FILE = DATA_DIRECTORY + "wikipedia_mappings/qid_to_wikipedia_abstract.tsv"
+QID_TO_ALIASES_FILE = DATA_DIRECTORY + "wikidata_mappings/qid_to_aliases.tsv"
 QID_TO_WIKIPEDIA_URL_FILE = DATA_DIRECTORY + "wikidata_mappings/qid_to_wikipedia_url.tsv"
 QID_TO_GENDER_FILE = DATA_DIRECTORY + "wikidata_mappings/qid_to_gender.tsv"
-QID_TO_GIVEN_NAME_FILE = DATA_DIRECTORY + "wikidata_mappings/qid_to_given_name.tsv"
+QID_TO_NAME_FILE = DATA_DIRECTORY + "wikidata_mappings/qid_to_name.tsv"
 QID_TO_SITELINK_FILE = DATA_DIRECTORY + "wikidata_mappings/qid_to_sitelink.tsv"
 QID_TO_DEMONYM_FILE = DATA_DIRECTORY + "wikidata_mappings/qid_to_demonym.tsv"
 QID_TO_LANGUAGE_FILE = DATA_DIRECTORY + "wikidata_mappings/qid_to_language.tsv"
@@ -80,7 +80,7 @@ RDF2VEC_MODEL_PATH = DATA_DIRECTORY + "linker_files/entity_embeddings/wikid2vec_
 
 
 # Benchmark files
-CONLL_BENCHMARK_FILE = DATA_DIRECTORY + "benchmarks/conll/conll-wikidata-iob-annotations"
+AIDA_CONLL_BENCHMARK_FILE = DATA_DIRECTORY + "benchmarks/aida/AIDA-YAGO2-dataset.tsv"
 
 ACE04_BENCHMARK_TEXTS = DATA_DIRECTORY + "benchmarks/ace2004/RawText/"
 ACE04_BENCHMARK_LABELS = DATA_DIRECTORY + "benchmarks/ace2004/ace2004.xml"
@@ -88,17 +88,17 @@ ACE04_BENCHMARK_LABELS = DATA_DIRECTORY + "benchmarks/ace2004/ace2004.xml"
 ACE04_ORIGINAL_BENCHMARK_TEXTS = DATA_DIRECTORY + "benchmarks/ace2004.original/RawTextsNoTranscripts/"
 ACE04_ORIGINAL_BENCHMARK_LABELS = DATA_DIRECTORY + "benchmarks/ace2004.original/ProblemsNoTranscripts/"
 
-MSNBC_BENCHMARK_TEXTS = DATA_DIRECTORY + "benchmarks/msnbc/RawText/"
-MSNBC_BENCHMARK_LABELS = DATA_DIRECTORY + "benchmarks/msnbc/msnbc.xml"
+MSNBC_BENCHMARK_TEXTS = DATA_DIRECTORY + "benchmarks/msnbc-updated/RawText/"
+MSNBC_BENCHMARK_LABELS = DATA_DIRECTORY + "benchmarks/msnbc-updated/msnbc.xml"
 
-MSNBC_ORIGINAL_BENCHMARK_TEXTS = DATA_DIRECTORY + "benchmarks/msnbc.original/RawTextsSimpleChars_utf8/"
-MSNBC_ORIGINAL_BENCHMARK_LABELS = DATA_DIRECTORY + "benchmarks/msnbc.original/Problems/"
+MSNBC_ORIGINAL_BENCHMARK_TEXTS = DATA_DIRECTORY + "benchmarks/msnbc/RawTextsSimpleChars_utf8/"
+MSNBC_ORIGINAL_BENCHMARK_LABELS = DATA_DIRECTORY + "benchmarks/msnbc/Problems/"
 
 BENCHMARK_DIR = "benchmarks/"
-WIKI_EX_BENCHMARK_FILE = BENCHMARK_DIR + "benchmark_labels_wiki-ex.jsonl"
+WIKI_EX_BENCHMARK_FILE = BENCHMARK_DIR + "wiki-ex.benchmark.jsonl"
 
 # Other files and paths
-EVALUATION_RESULTS_DIR = "evaluation_results/"
+EVALUATION_RESULTS_DIR = "evaluation-results/"
 LOG_PATH = "logs/"
 
 

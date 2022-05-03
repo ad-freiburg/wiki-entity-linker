@@ -15,7 +15,6 @@ per line.
 """
 
 import argparse
-import time
 import log
 import sys
 import os
@@ -57,10 +56,8 @@ def main(args):
     logger.info("Linking entities in %s benchmark ..." % args.benchmark)
 
     for i, article in enumerate(example_generator.iterate(args.n_articles)):
-        article_start_time = time.time()
         evaluation_span = article.evaluation_span if args.evaluation_span else None
         linking_system.link_entities(article, args.uppercase, args.only_pronouns, evaluation_span)
-        article.set_evaluation_time(time.time() - article_start_time)
         output_file.write(article.to_json() + '\n')
         print("\r%i articles" % (i + 1), end='')
     print()
@@ -81,7 +78,7 @@ if __name__ == "__main__":
                         help="Entity linker type.")
     parser.add_argument("linker",
                         help="Specify the linker to be used, depending on its type:\n"
-                             "BASELINE: Choose baseline from {scores, links, links-all, max-match-ner}.\n"
+                             "BASELINE: Choose baseline from {wikipedia, wikidata, max-match-ner}.\n"
                              "SPACY: Name of the linker.\n"
                              "EXPLOSION: Full path to the saved model.\n"
                              "AMBIVERSE: Full path to the predictions directory.\n"

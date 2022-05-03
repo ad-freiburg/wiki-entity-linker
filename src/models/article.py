@@ -7,7 +7,6 @@ from src.evaluation.groundtruth_label import GroundtruthLabel, groundtruth_label
 from src.models.entity_mention import EntityMention, entity_mention_from_dict
 from src.models.entity_prediction import EntityPrediction
 
-
 ABSTRACT_INDICATOR = "ABSTRACT"
 
 
@@ -16,57 +15,52 @@ class Article:
                  id: int,
                  title: str,
                  text: str,
-                 links: List[Tuple[Tuple[int, int], str]],
+                 hyperlinks: Optional[List[Tuple[Tuple[int, int], str]]] = None,
                  title_synonyms: Optional[List[Tuple[int, int]]] = None,
                  url: Optional[str] = None,
                  entity_mentions: Optional[List[EntityMention]] = None,
                  evaluation_span: Optional[Tuple[int, int]] = None,
                  labels: Optional[List[GroundtruthLabel]] = None,
-                 sections: Optional[List[Tuple[Tuple[int, int], str]]] = None,
-                 evaluation_time: Optional[float] = None):
+                 sections: Optional[List[Tuple[Tuple[int, int], str]]] = None):
         self.id = id
         self.title = title
         self.text = text
-        self.links = links
+        self.hyperlinks = hyperlinks if hyperlinks else []
         self.title_synonyms = title_synonyms if title_synonyms else []
         self.url = url
-        self.entity_mentions = None
+        self.entity_mentions = {}
         self.entity_coverage = None
         self.span_to_span_id = dict()
         self.spans = []
         self.add_entity_mentions(entity_mentions)
         self.evaluation_span = evaluation_span if evaluation_span is not None else (0, len(self.text))
-        self.labels = labels
+        self.labels = labels if labels else []
         self.sections = sections
-        self.evaluation_time = evaluation_time
 
     def to_dict(self) -> Dict:
         data = {"id": self.id,
                 "title": self.title,
-                "text": self.text,
-                "links": self.links}
-        if self.title_synonyms is not None:
+                "text": self.text}
+        if self.hyperlinks:
+            data["hyperlinks"] = self.hyperlinks
+        if self.title_synonyms:
             data["title_synonyms"] = self.title_synonyms
         if self.url is not None:
             data["url"] = self.url
-        if self.entity_mentions is not None:
+        if self.entity_mentions:
             data["entity_mentions"] = [self.entity_mentions[span].to_dict() for span in sorted(self.entity_mentions)]
         if self.evaluation_span is not None:
             data["evaluation_span"] = self.evaluation_span
         if self.labels is not None:
             data["labels"] = [label.to_dict() for label in sorted(self.labels)]
-        if self.sections is not None:
+        if self.sections:
             data["sections"] = self.sections
-        if self.evaluation_time is not None:
-            data["evaluation_time"] = self.evaluation_time
         return data
 
     def to_json(self) -> str:
         return json.dumps(self.to_dict())
 
     def add_entity_mentions(self, entity_mentions: Optional[List[EntityMention]]):
-        if self.entity_mentions is None and entity_mentions is not None:
-            self.entity_mentions = {}
         if entity_mentions is not None:
             for entity_mention in entity_mentions:
                 self.entity_mentions[entity_mention.span] = entity_mention
@@ -117,9 +111,6 @@ class Article:
     def set_evaluation_span(self, start: int, end: int):
         self.evaluation_span = (start, end)
 
-    def set_evaluation_time(self, evaluation_time: float):
-        self.evaluation_time = evaluation_time
-
     def get_span_by_id(self, span_id: int) -> Tuple[int, int]:
         if span_id - 1 < len(self.spans):
             return self.spans[span_id - 1]
@@ -151,31 +142,24 @@ class Article:
 
 
 def article_from_dict(data: Dict) -> Article:
-    links = [(tuple(span), target) for span, target in data["links"]]  # span is saved as list, but must be tuple
+    # spans are saved as lists, but must be tuples
+    hyperlinks = [(tuple(span), target) for span, target in data["hyperlinks"]] if "hyperlinks" in data else None
     title_synonyms = [tuple(span) for span in data["title_synonyms"]] if "title_synonyms" in data else None
     sections = [(tuple(span), title) for span, title in data["sections"]] if "sections" in data else None
     labels = None
-    if "labels" in data:
-        # Ensure backwards compatibility
-        if len(data["labels"]) > 0 and type(data["labels"][0]) is dict:
-            labels = [groundtruth_label_from_dict(groundtruth_label_dict) for groundtruth_label_dict in data["labels"]]
-        else:
-            labels = []
-            for span, entity_id in data["labels"]:
-                gt_label = GroundtruthLabel(0, span, entity_id, None)
-                labels.append(gt_label)
+    if "labels" in data and len(data["labels"]) > 0:
+        labels = [groundtruth_label_from_dict(groundtruth_label_dict) for groundtruth_label_dict in data["labels"]]
     return Article(id=int(data["id"]),
                    title=data["title"],
                    text=data["text"],
-                   links=links,
+                   hyperlinks=hyperlinks,
                    title_synonyms=title_synonyms,
                    url=data["url"] if "url" in data else None,
                    entity_mentions=[entity_mention_from_dict(entity_mention_dict) for entity_mention_dict in
-                                             data["entity_mentions"]] if "entity_mentions" in data else None,
+                                    data["entity_mentions"]] if "entity_mentions" in data else None,
                    evaluation_span=data["evaluation_span"] if "evaluation_span" in data else None,
                    labels=labels,
-                   sections=sections,
-                   evaluation_time=data["evaluation_time"] if "evaluation_time" in data else None)
+                   sections=sections)
 
 
 def article_from_json(dump: str) -> Article:

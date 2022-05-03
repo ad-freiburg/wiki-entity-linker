@@ -5,6 +5,7 @@
 		<link rel="stylesheet" type="text/css" href="style.css">
 		<link rel="stylesheet" type="text/css" href="https://mottie.github.io/tablesorter/dist/css/theme.default.min.css">
 		<script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+		<script type="text/javascript" src="bootstrap/js/bootstrap.js"></script>
 		<script type="text/javascript" src="https://mottie.github.io/tablesorter/dist/js/jquery.tablesorter.min.js"></script>
 		<script type="text/javascript" src="https://mottie.github.io/tablesorter/dist/js/widgets/widget-stickyHeaders.min.js"></script>
 		<script type="text/javascript" src="show_benchmark.js"></script>
@@ -24,23 +25,38 @@
 						<tr><td>Filter results by keywords: </td><td><input id="result-filter"></td></tr>
 					</tbody></table>
 				</div>
-
-				<div id="generate_url_container">
-					<div id="generate_url">
-						<button class="btn btn-default" onmouseover="generate_and_show_url()" onclick="copy_generated_url()">Generate URL for this view</button>
-						<div class="tooltiptext"></div>
-					</div>
-				</div>
 			</div>
 
 			<div>
-				<input type="checkbox" id="checkbox_deprecated" onchange="filter_table_rows()">
+				<input type="checkbox" id="checkbox_deprecated" onchange="toggle_show_deprecated()">
 				<label for="checkbox_deprecated">Show deprecated</label>
 			</div>
 
 			<div>
 				<input type="checkbox" id="checkbox_compare" onchange="toggle_compare()">
 				<label for="checkbox_compare">Compare two systems</label>
+			</div>
+
+			<!-- Modal -->
+			<div class="modal" id="example_benchmark_modal" tabindex="-1" role="dialog">
+				<div id="example_benchmark_modal_dialog" class="modal-dialog modal-dialog-centered" role="document">
+					<div class="modal-content">
+						<div class="modal-header">
+							<button type="button" class="close" data-dismiss="modal">
+								<span>&times;</span>
+							</button>
+						</div>
+						<div class="modal-body">
+							<table id="example_prediction_overview" class="article_table">
+								<thead><tr><th></th></tr></thead>
+								<tbody><tr><td></td></tr></tbody>
+							</table>
+						</div>
+						<div class="modal-footer">
+							<button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+						</div>
+					</div>
+				</div>
 			</div>
 		</div>
 
@@ -75,7 +91,7 @@
 		</div>
 
 		<div id="article-results" class="content_box">
-			<h3>Results per article</h3>
+			<h3>Linking results</h3>
 
 			<div id="loading"></div>
 
@@ -129,7 +145,7 @@
 				</div>
 			</div>
 
-			<table id="prediction_overview">
+			<table id="prediction_overview" class="article_table">
 				<thead>
 					<tr>
 						<th></th><th></th>

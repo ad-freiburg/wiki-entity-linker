@@ -12,10 +12,9 @@ RUN python3 -m spacy download en_core_web_lg
 RUN python3 -m spacy download en_core_web_sm
 COPY src src
 COPY benchmark-webapp benchmark-webapp
-COPY benchmarks benchmarks
 COPY evaluation-webapp evaluation-webapp
-RUN mkdir third_party
-COPY third_party/wiki_extractor third_party/wiki_extractor
+RUN mkdir third-party
+COPY third-party/wiki_extractor third-party/wiki_extractor
 COPY wikidata-types wikidata-types
 COPY data data
 COPY Makefile .
@@ -30,7 +29,7 @@ CMD umask 000; /bin/bash;
 
 
 # Build the container:
-# docker build -t wiki-entity-linker .
+# docker build -t elevant .
 
 # Run the container:
-# docker run -it -v <data_directory>:/data wiki-entity-linker
+# docker run -it -p 8000:8000 -v <data_directory>:/data -v $(pwd)/evaluation-results/:/home/evaluation-results -v $(pwd)/benchmarks/:/home/benchmarks elevant

@@ -52,7 +52,7 @@ def article_iterator(filename):
             if i == args.n_articles:
                 break
             if args.raw_input:
-                article = Article(id=i, title="", text=line[:-1], links=[])
+                article = Article(id=i, title="", text=line[:-1])
             else:
                 article = WikipediaDumpReader.json2article(line)
             yield article, args.uppercase, args.only_pronouns
@@ -113,7 +113,7 @@ if __name__ == "__main__":
                         help="Entity linker type.")
     parser.add_argument("linker",
                         help="Specify the linker to be used, depending on its type:\n"
-                        "BASELINE: Choose baseline from {scores, links, links-all, max-match-ner}.\n"
+                        "BASELINE: Choose baseline from {wikipedia, wikidata, max-match-ner}.\n"
                         "SPACY: Name of the linker.\n"
                         "EXPLOSION: Full path to the saved model.\n"
                         "AMBIVERSE: Full path to the predictions directory (for Wikipedia or own benchmark only).\n"
