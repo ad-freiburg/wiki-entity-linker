@@ -15,7 +15,7 @@ class LinkEntityLinker:
 
     def link_entities(self, article: Article):
         entity_mentions = []
-        for span, target in article.links:
+        for span, target in article.hyperlinks:
             if target in self.mapping:
                 entity_id = self.mapping[target]
                 entity_mention = EntityMention(span=span,

@@ -75,11 +75,11 @@ class LinkTextEntityLinker:
                 if bracketless_title not in entity_synonyms:
                     entity_synonyms[bracketless_title] = title_entity_id
             if article.title_synonyms:
-                # Bold title spans are treated like links. Not like synonyms of hyperlinked entities
+                # Bold title spans are treated like hyperlinks. Not like synonyms of hyperlinked entities
                 bold_title_spans = [((s, e), article.title) for (s, e) in article.title_synonyms]
 
-        # Link article links to Wikidata ids
-        for span, target in bold_title_spans + article.links:
+        # Link article hyperlinks to Wikidata ids
+        for span, target in bold_title_spans + article.hyperlinks:
             # Overlaps are possible due to possible overlap between link and bold title synonym
             if is_overlapping_span(covered_positions, (span[0], span[1])):
                 continue
