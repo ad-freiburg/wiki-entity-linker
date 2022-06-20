@@ -1,0 +1,5 @@
+{
+  "name": "VanillaLocalLinker",
+  "kb": "wikipedia",
+  "model_path": "/local/data/entity-linking/linker_files/nn_linker_models/global_model_prior.rdf2vec.100000.200ep.16bs.512hu.01lr.0do.best.pt"
+}

@@ -134,12 +134,12 @@ You can add an experiment, i.e. a row in the table for a particular benchmark, i
 ### Link Benchmark Articles
 To link the articles of a benchmark with a single linker configuration, use the script `link_benchmark_entities.py`:
 
-    python3 link_benchmark_entities.py <experiment_name> <linker_type> <linker_info> -b <benchmark_name>
+    python3 link_benchmark_entities.py <experiment_name> -l <linker_name> -b <benchmark_name>
 
-The linking results will be written to `evaluation-results/<linker_type>/<experiment_name>.<benchmark_name>.jsonl`.
+The linking results will be written to `evaluation-results/<linker_name>/<experiment_name>.<benchmark_name>.jsonl`.
 For example
 
-    python3 link_benchmark_entities.py ltl.popular_entities.entity_coref popular_entities 15 -b wiki-ex -ll link-text-linker -coref entity
+    python3 link_benchmark_entities.py ltl.popular_entities.entity_coref -l popular_entities -b wiki-ex -ll link-text-linker -coref entity
 
 will create the file `evaluation-results/popular_entities/ltl.popular_entities.entity_coref.wiki-ex.jsonl`. The result
  file contains one article as JSON object per line. Each JSON object contains benchmark article information such as

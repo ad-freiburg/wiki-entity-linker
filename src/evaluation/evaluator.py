@@ -1,13 +1,11 @@
 import logging
-from typing import List, Set, Optional
+from typing import List, Set, Optional, Dict, Tuple
 
 from src import settings
 from src.evaluation.case import Case, ErrorLabel
 from src.evaluation.coreference_groundtruth_generator import CoreferenceGroundtruthGenerator
 from src.evaluation.case_generator import CaseGenerator
 from src.evaluation.groundtruth_label import GroundtruthLabel
-from src.evaluation.print_methods import print_colored_text, print_article_nerd_evaluation, \
-    print_article_coref_evaluation, print_evaluation_summary, create_f1_dict_from_counts
 from src.evaluation.mention_type import is_named_entity
 from src.helpers.entity_database_reader import EntityDatabaseReader
 from src.models.entity_database import EntityDatabase
@@ -37,7 +35,35 @@ def load_evaluation_entities(relevant_entity_ids: Set[str], type_mapping_file: s
     return entity_db
 
 
-EVALUATION_CATEGORIES = ("all", "NER", "coref", "entity", "entity_named", "entity_other", "nominal", "pronominal")
+def percentage(nominator: int, denominator: int) -> Tuple[float, int, int]:
+    if denominator == 0:
+        percent = 0
+    else:
+        percent = nominator / denominator * 100
+    return percent, nominator, denominator
+
+
+def create_f1_dict(tp: int, fp: int, fn: int) -> Dict:
+    precision = tp / (tp + fp) if (tp + fp) > 0 else 0
+    ground_truth = tp + fn
+    recall = tp / ground_truth if ground_truth > 0 else 0
+    f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0
+    return {
+        "true_positives": tp,
+        "false_positives": fp,
+        "false_negatives": fn,
+        "ground_truth": ground_truth,
+        "precision": precision,
+        "recall": recall,
+        "f1": f1
+    }
+
+
+def create_f1_dict_from_counts(counts: Dict):
+    return create_f1_dict(counts["tp"], counts["fp"], counts["fn"])
+
+
+EVALUATION_CATEGORIES = ("all", "NER", "entity", "entity_named", "entity_other", "coref", "coref_nominal", "coref_pronominal")
 
 
 class Evaluator:
@@ -48,7 +74,7 @@ class Evaluator:
                  load_data: bool = True,
                  coreference: bool = True,
                  contains_unknowns: bool = True):
-        self.type_id_to_label = EntityDatabaseReader.read_whitelist_types(whitelist_file)
+        self.whitelist_types = EntityDatabaseReader.read_whitelist_types(whitelist_file, with_adjustments=True)
         self.all_cases = []
         if load_data:
             self.entity_db = load_evaluation_entities(relevant_entity_ids, type_mapping_file)
@@ -61,9 +87,8 @@ class Evaluator:
             self.counts[key] = {"tp": 0, "fp": 0, "fn": 0}
         self.error_counts = {label: 0 for label in ErrorLabel}
         self.type_counts = {GroundtruthLabel.OTHER: {"tp": 0, "fp": 0, "fn": 0}}
-        for type_id in self.type_id_to_label:
-            type_key = self.get_type_keys([type_id])[0]
-            self.type_counts[type_key] = {"tp": 0, "fp": 0, "fn": 0}
+        for type_id in self.whitelist_types:
+            self.type_counts[type_id] = {"tp": 0, "fp": 0, "fn": 0}
         self.has_candidates = False
         self.n_entity_lowercase = 0
         self.n_entity_contains_space = 0
@@ -89,7 +114,10 @@ class Evaluator:
                     self.counts["NER"]["fn"] += 1
                 if not is_named_entity(case.text):
                     self.n_entity_lowercase += 1
-            elif not case.has_ground_truth() or (not case.is_known_entity() and case.has_predicted_entity()):
+            elif not case.has_ground_truth() or (not case.is_known_entity() and case.predicted_entity is not None):
+                # Don't use case.has_predicted_entity() here, because this is false for NIL predictions,
+                # but NIL predictions should not be ignored when evaluating NER.
+                # TODO: shouldn't case.has_predicted_entity() be outside the brackets?
                 # If case has no GT or if GT entity is unknown, the case has a predicted entity -> FP
                 # otherwise ignore the case (NIL-entities are not expected to be predicted and should not count towards
                 # errors)
@@ -108,9 +136,8 @@ class Evaluator:
             else:
                 type_ids = case.true_entity.type
                 type_ids = type_ids.split("|")
-                type_keys = self.get_type_keys(type_ids)
-                for tk in type_keys:
-                    self.type_counts[tk]["tp"] += 1
+                for type_id in type_ids:
+                    self.type_counts[type_id]["tp"] += 1
 
         else:
             if case.is_false_positive() and not case.is_true_quantity_or_datetime() and case.factor != 0:
@@ -125,9 +152,8 @@ class Evaluator:
                         type_ids = self.entity_db.get_entity(pred_entity_id).type.split("|")
                     else:
                         type_ids = [GroundtruthLabel.OTHER]
-                    type_keys = self.get_type_keys(type_ids)
-                    for tk in type_keys:
-                        self.type_counts[tk]["fp"] += 1
+                    for type_id in type_ids:
+                        self.type_counts[type_id]["fp"] += 1
 
             if case.is_false_negative() and not case.is_optional() and case.true_entity.parent is None:
                 self.counts["all"]["fn"] += 1
@@ -138,19 +164,8 @@ class Evaluator:
                 else:
                     type_ids = case.true_entity.type
                     type_ids = type_ids.split("|")
-                    type_keys = self.get_type_keys(type_ids)
-                    for tk in type_keys:
-                        self.type_counts[tk]["fn"] += 1
-
-    def get_type_keys(self, type_ids: List[str]) -> List[str]:
-        type_keys = []
-        for type_id in type_ids:
-            if type_id in self.type_id_to_label:
-                type_label = self.type_id_to_label[type_id]
-                type_keys.append(type_id + ":" + type_label)
-            else:
-                type_keys.append(type_id)
-        return type_keys
+                    for type_id in type_ids:
+                        self.type_counts[type_id]["fn"] += 1
 
     def count_error_labels(self, case: Case):
         for label in case.error_labels:
@@ -167,28 +182,27 @@ class Evaluator:
 
         return cases
 
-    @staticmethod
-    def print_article_evaluation(article: Article, cases: List[Case]):
-        print_colored_text(cases, article.text)
-        print_article_nerd_evaluation(cases, article.text)
-        print_article_coref_evaluation(cases, article.text)
-
-    def print_results(self):
-        print_evaluation_summary(self.counts)
-
     def get_results_dict(self):
         self.counts["entity"]["tp"] = self.counts["entity_named"]["tp"] + self.counts["entity_other"]["tp"]
         self.counts["entity"]["fp"] = self.counts["entity_named"]["fp"] + self.counts["entity_other"]["fp"]
         self.counts["entity"]["fn"] = self.counts["entity_named"]["fn"] + self.counts["entity_other"]["fn"]
-        results_dict = {
+
+        results_dict = {}
+        results_dict["mention_types"] = {
             category: create_f1_dict_from_counts(self.counts[category]) for category in EVALUATION_CATEGORIES
         }
-        results_dict["errors"] = {}
-        results_dict["errors"]["undetected"] = {
+
+        results_dict["error_categories"] = {}
+
+        # Move NER results to error categories
+        results_dict["error_categories"]["NER"] = results_dict["mention_types"]["NER"]
+        del results_dict["mention_types"]["NER"]
+
+        results_dict["error_categories"]["undetected"] = {
             # Undetected
             "all": {
                 "errors": self.error_counts[ErrorLabel.UNDETECTED],
-                "total": results_dict["NER"]["ground_truth"]
+                "total": results_dict["error_categories"]["NER"]["ground_truth"]
             },
             "lowercase": {
                 "errors": self.error_counts[ErrorLabel.UNDETECTED_LOWERCASE],
@@ -200,14 +214,14 @@ class Evaluator:
             },
             "partial_overlap": {
                 "errors": self.error_counts[ErrorLabel.UNDETECTED_PARTIAL_OVERLAP],
-                "total": results_dict["NER"]["ground_truth"] - self.n_entity_lowercase
+                "total": results_dict["error_categories"]["NER"]["ground_truth"] - self.n_entity_lowercase
             },
             "other": {
                 "errors": self.error_counts[ErrorLabel.UNDETECTED_OTHER],
-                "total": results_dict["NER"]["ground_truth"] - self.n_entity_lowercase
+                "total": results_dict["error_categories"]["NER"]["ground_truth"] - self.n_entity_lowercase
             }
         }
-        results_dict["errors"]["false_detection"] = {
+        results_dict["error_categories"]["false_detection"] = {
             # False detection
             "all": self.error_counts[ErrorLabel.FALSE_DETECTION],
             "abstract_entity": self.error_counts[ErrorLabel.FALSE_DETECTION_ABSTRACT_ENTITY],
@@ -218,7 +232,7 @@ class Evaluator:
                 "total": self.counts["all"]["fp"] + self.counts["all"]["tp"]
             }
         }
-        results_dict["errors"]["wrong_disambiguation"] = {
+        results_dict["error_categories"]["wrong_disambiguation"] = {
             # Disambiguation errors
             "all": {
                 "errors": self.error_counts[ErrorLabel.DISAMBIGUATION_WRONG],
@@ -255,7 +269,7 @@ class Evaluator:
                          self.error_counts[ErrorLabel.DISAMBIGUATION_MULTI_CANDIDATES_CORRECT]
             } if self.has_candidates else None
         }
-        results_dict["errors"]["other_errors"] = {
+        results_dict["error_categories"]["other_errors"] = {
             # Other errors
             "hyperlink": {
                 "errors": self.error_counts[ErrorLabel.HYPERLINK_WRONG],
@@ -263,27 +277,37 @@ class Evaluator:
                          self.error_counts[ErrorLabel.HYPERLINK_WRONG]
             },
         }
-        results_dict["errors"]["wrong_coreference"] = {
+        results_dict["error_categories"]["wrong_coreference"] = {
             # Coreference errors
             "undetected": {
                 "errors": self.error_counts[ErrorLabel.COREFERENCE_UNDETECTED],
-                "total": results_dict["coref"]["ground_truth"]
+                "total": results_dict["mention_types"]["coref"]["ground_truth"]
             },
             "wrong_mention_referenced": {
                 "errors": self.error_counts[ErrorLabel.COREFERENCE_WRONG_MENTION_REFERENCED],
-                "total": results_dict["coref"]["ground_truth"] -
+                "total": results_dict["mention_types"]["coref"]["ground_truth"] -
                          self.error_counts[ErrorLabel.COREFERENCE_UNDETECTED]
             },
             "reference_wrongly_disambiguated": {
                 "errors": self.error_counts[ErrorLabel.COREFERENCE_REFERENCE_WRONGLY_DISAMBIGUATED],
-                "total": results_dict["coref"]["ground_truth"] -
+                "total": results_dict["mention_types"]["coref"]["ground_truth"] -
                          self.error_counts[ErrorLabel.COREFERENCE_UNDETECTED] -
                          self.error_counts[ErrorLabel.COREFERENCE_WRONG_MENTION_REFERENCED]
             },
             "false_detection": self.error_counts[ErrorLabel.COREFERENCE_FALSE_DETECTION]
         }
         # Type results
-        results_dict["by_type"] = {}
-        for type_key in self.type_counts:
-            results_dict["by_type"][type_key] = create_f1_dict_from_counts(self.type_counts[type_key])
+        results_dict["entity_types"] = {}
+        for type_id in self.type_counts:
+            results_dict["entity_types"][type_id] = create_f1_dict_from_counts(self.type_counts[type_id])
         return results_dict
+
+    def print_results(self):
+        print("== EVALUATION ==")
+        for cat in self.counts:
+            print()
+            print("= %s =" % cat)
+            f1_dict = create_f1_dict(self.counts[cat]["tp"], self.counts[cat]["fp"], self.counts[cat]["fn"])
+            print("precision:\t%.2f%%" % (f1_dict["precision"] * 100))
+            print("recall:\t\t%.2f%%" % (f1_dict["recall"] * 100))
+            print("f1:\t\t%.2f%%" % (f1_dict["f1"] * 100))

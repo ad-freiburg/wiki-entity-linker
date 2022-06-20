@@ -8,6 +8,7 @@ import re
 import logging
 
 from src.prediction_readers.abstract_prediction_reader import AbstractPredictionReader
+from src.utils.knowledge_base_mapper import KnowledgeBaseMapper
 
 logger = logging.getLogger("main." + __name__.split(".")[-1])
 
@@ -26,7 +27,6 @@ class WexeaPredictionReader(AbstractPredictionReader):
         """
         linked_file = open(file_path, "r", encoding='utf8')
         linked_text = ''.join(linked_file.readlines())
-        no_mapping_count = 0
         text_position = 0
         text = ""
         predictions = dict()
@@ -40,10 +40,7 @@ class WexeaPredictionReader(AbstractPredictionReader):
             link_end_pos = len(text)
             span = (link_start_pos, link_end_pos)
             text_position = link_match.end()
-            entity_id = self.entity_db.link2id(link_target)
-            if entity_id is None:
-                logger.warning("\nNo mapping to Wikidata found for label '%s'" % link_target)
-                no_mapping_count += 1
+            entity_id = KnowledgeBaseMapper.get_wikidata_qid(link_target, self.entity_db, verbose=False)
             candidates = {entity_id}
             if link_type == "UNKNOWN":
                 # These should not be added as predictions, since WEXEA considers them unlinked
@@ -54,8 +51,6 @@ class WexeaPredictionReader(AbstractPredictionReader):
             if (coref and link_type == "COREF") or (not coref and link_type != "COREF"):
                 predictions[span] = EntityPrediction(span, entity_id, candidates)
         text += linked_text[text_position:]
-        if no_mapping_count > 0:
-            logger.warning("\n%d entity labels could not be matched to any Wikidata ID." % no_mapping_count)
         return predictions
 
     def predictions_iterator(self) -> Iterator[Dict[Tuple[int, int], EntityPrediction]]:

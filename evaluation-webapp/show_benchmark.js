@@ -1,3 +1,5 @@
+CONFIG_PATH = "config.json";
+
 ANNOTATION_CLASS_TP = "tp";
 ANNOTATION_CLASS_FP = "fp";
 ANNOTATION_CLASS_FN = "fn";
@@ -15,47 +17,104 @@ MAX_SELECTED_APPROACHES = 2;
 MAX_CACHED_FILES = 15;
 
 MISSING_LABEL_TEXT = "[MISSING LABEL]";
+NIL_PREDICTION_TEXT = "[NIL]";
 NO_LABEL_ENTITY_IDS = ["QUANTITY", "DATETIME", "Unknown"];
 
 ignore_headers = ["true_positives", "false_positives", "false_negatives", "ground_truth"];
 percentage_headers = ["precision", "recall", "f1"];
 copy_latex_text = "Copy LaTeX code for table";
 
-tooltip_example_html = " <a href=\"#example_benchmark_modal\"onclick=\"show_example_benchmark_modal(this)\" data-toggle=\"modal\" data-target=\"#example_benchmark_modal\">For an example click here</a>.";
+tooltip_example_html = "<br><a href=\"#example_benchmark_modal\"onclick=\"show_example_benchmark_modal(this)\" data-toggle=\"modal\" data-target=\"#example_benchmark_modal\">For an example click here</a>.";
 header_descriptions = {
     "undetected": {
-        "all": "The span of a GT mention was not linked (= NER FN) (Total: Named GT mentions).",
-        "lowercase": "The span of a lowercase GT mention was not linked (Total: Named lowercase GT mentions).",
-        "partially_included": "FN and a part of the GT mention was linked to an arbitrary entity (Total: Named GT mentions containing whitespace(s)).",
-        "partial_overlap": "FN and the GT span overlaps with a predicted span (Total: Named uppercase GT mentions).",
-        "other": "Other detection error (Total: Named uppercase GT mentions)."
-    },
-    "wrong_disambiguation": {
-        "all": "Detected, but wrong entity linked (Total: Detected).",
-        "demonym": "FN from a list of demonyms (German, Germans, ...) (Total: All demonym GT mentions).",
-        "partial_name": "FN and the GT mention is part of the entity name (Total: Named GT mentions where the mention is a part of the entity name).",
-        "metonymy": "Predicted and most popular candidate are locations, but ground truth is not (Total: Most popular candidate is a location, but ground truth is not).",
-        "rare": "Most popular candidate is wrongly predicted (Total: Detected mentions where the most popular candidate is not the correct entity).",
-        "other": "Other disambiguation error",
-        "wrong_candidates": "A GT mention was recognized but the GT entity is not among the candidates (Total: Named detected).",
-        "multi_candidates": "A GT mention was recognized and the GT entity is one of the candidates, but the wrong candidate was selected (Total: Named detected where the GT entity is one of multiple candidates)."
+        "": "Errors involving undetected mentions.",
+        "all": "<i>Numerator:</i> A ground truth mention span is not linked to an entity.<br><i>Denominator:</i> All ground truth entity mentions.",
+        "lowercase": "<i>Numerator:</i> Undetected lowercased ground truth mention.<br><i>Denominator:</i> All lowercased ground truth mentions.",
+        "partially_included": "<i>Numerator:</i> A part of the ground truth mention is linked to an entity.<br><i>Denominator:</i> All ground truth mentions consisting of multiple words.",
+        "partial_overlap": "<i>Numerator:</i> Undetected mention that overlaps with a predicted mention.<br><i>Denominator:</i> All ground truth mentions that are not lowercased.",
+        "other": "<i>Numerator:</i> Undetected mention that does not fall into any of the other categories.<br><i>Denominator:</i> All ground truth mentions that are not lowercased."
     },
     "false_detection": {
-        "all": "Predicted mention that does not match a groundtruth mention span",
-        "abstract_entity": "Lowercase named FP that does not overlap with a GT mention",
-        "unknown_entity": "Uppercase mention wrongly linked, where the ground truth is either Unknown or has no label at all",
-        "other": "Other false detection",
-        "wrong_span": "Predicted mention whose span does not match, but overlaps with a GT mention with a matching entity (Total: Predicted mentions)."
+        "": "Errors involving false detections.",
+        "all": "A mention is predicted whose span is not linked in the ground truth.",
+        "abstract_entity": "The predicted mention is lowercased and does not overlap with a ground truth mention.",
+        "unknown_entity": "The predicted mention is uppercased and the ground truth is \"Unknown\".",
+        "other": "NER false positive that does not fall into any of the other categories.",
+        "wrong_span": "<i>Numerator:</i> The predicted mention overlaps with a ground truth mention of the same entity, but the spans do not match exactly.<br><i>Denominator</i>: All predicted mentions."
+    },
+    "wrong_disambiguation": {
+        "": "NER true positives where a wrong entity was linked.",
+        "all": "<i>Numerator:</i> A ground truth span was detected, but linked to the wrong entity.<br><i>Denominator:</i> All NER true positives.",
+        "demonym": "<i>Numerator:</i> FP & FN and the mention text is a demonym, i.e. it is contained in a list of demonyms from Wikidata.<br><i>Denominator:</i> NER true positives where the mention text is a demonym.",
+        "metonymy": "<i>Numerator:</i> FP & FN and the most popular entity for the given mention text and the prediction are locations, the ground truth is not a location.<br><i>Denominator:</i> NER true positives where the most popular candidate is a location but the ground truth is not.",
+        "partial_name": "<i>Numerator:</i> FP & FN and the mention text is a part of the ground truth entity name.<br><i>Denominator:</i> NER true positives that are a part of the ground truth entity name.",
+        "rare": "<i>Numerator:</i> FP & FN and the most popular entity for the given mention text was predicted instead of the less popular ground truth entity.<br><i>Denominator:</i> NER true positives where the most popular candidate is not the correct entity.",
+        "other": "Disambiguation error that does not fall into any of the other categories.",
+        "wrong_candidates": "<i>Numerator:</i> FP & FN and the ground truth entity is not in the candidate set returned by the linker for the mention.<br><i>Denominator:</i> All NER true positives.",
+        "multi_candidates": "<i>Numerator:</i> FP & FN and the candidate set for the mention contains multiple candidate entities, one of which is the ground truth entity, and the linker chose a wrong entity.<br><i>Denominator:</i> NER true positives where the linker returned a candidate set with more than one entity and the ground truth is contained in the candidate set."
     },
     "other_errors": {
-        "hyperlink": "FN where the mention is a hyperlink (Total: GT mentions that are hyperlinks)."
+        "": "Errors that are not clearly distinguishable as NER false negatives, NER false positives or disambiguation errors.",
+        "hyperlink": "<i>Numerator:</i> Undetected mention that is also a hyperlink.<br><i>Denominator:</i> All ground truth mentions that are hyperlinks."
     },
     "wrong_coreference": {
-        "false_detection": "FP mentions in {It, it, This, this, That, that, Its, its}",
-        "reference_wrongly_disambiguated": "FN + FP, the reference was wrongly disambiguated (Total: Coreference mentions where correct GT mention was referenced).",
-        "wrong_mention_referenced": "FN + FP, wrong mention was referenced (Total: Linked GT coreference mentions).",
-        "undetected": "FN, mention was not linked (Total: GT coreference mentions)."
-    }
+        "": "Coreference errors.",
+        "false_detection": "NER FP with a mention text in {It, it, This, this, That, that, Its, its}",
+        "reference_wrongly_disambiguated": "<i>Numerator:</i> Coreference FN & FP and the reference was wrongly disambiguated.<br><i>Denominator:</i> Coreference mentions where the correct ground truth mention was referenced.",
+        "wrong_mention_referenced": "<i>Numerator:</i> Coreference FN + FP and the wrong mention was referenced.<br><i>Denominator:</i> Coreference NER true positives.",
+        "undetected": "<i>Numerator:</i> Coreference FN and the mention was not linked.<br><i>Denominator:</i> Ground truth coreference mentions."
+    },
+    "NER": {
+        "": "Named Entity Recognition results.",
+        "tp": "TP: Predictions with a matching ground truth span.<br>",
+        "fp": "FP: Predictions with no matching ground truth span.<br>",
+        "fn": "FN: Ground truth spans with no matching prediction span."
+    },
+    "all": {
+        "": "Overall entity linking and coreference results.",
+        "tp": "TP: Predictions where the mention span and entity match a groundtruth mention span and entity.<br>",
+        "fp": "FP: Predictions where the mention either does not match a groundtruth mention span or the predicted entity does not match the groundtruth entity.<br>",
+        "fn": "FN: Groundtruth where the mention either does not match a predicted mention span or the predicted entity does not match the groundtruth entity."
+    },
+    "entity": {
+        "": "Entity linking results.",
+        "tp": "TP: True positive entities (excluding coreferences).<br>",
+        "fp": "FP: False positive entities (excluding coreferences).<br>",
+        "fn": "FN: False negative entities (excluding coreferences)."
+    },
+    "entity_named": {
+        "": "Entity linking results for named entities, i.e. entities where the first alphabetic character is an uppercase letter.",
+        "tp": "TP: True positive named entities.<br>",
+        "fp": "FP: False positive named entities.<br>",
+        "fn": "FN: False negative named entities."
+    },
+    "entity_other": {
+        "": "Entity linking results for non-named entities, i.e. entities where the first alphabetic character is a lowercase letter.",
+        "tp": "TP: True positive non-named (i.e. lowercase) entities.<br>",
+        "fp": "FP: False positive non-named (i.e. lowercase) entities.<br>",
+        "fn": "FN: False negative non-named (i.e. lowercase) entities."
+    },
+    "coref": {
+        "": "Coreference results.",
+        "tp": "TP: True positive coreferences.<br>",
+        "fp": "FP: False positive coreferences.<br>",
+        "fn": "FN: False negative coreferences."
+    },
+    "coref_pronominal": {
+        "": "Results for pronominal coreference, i.e. the mention text is a pronoun.",
+        "tp": "TP: True positive pronominal coreferences (mention text is a pronoun).<br>",
+        "fp": "FP: False positive pronominal coreferences (mention text is a pronoun).<br>",
+        "fn": "FN: False negative pronominal coreferences (mention text is a pronoun)."
+    },
+    "coref_nominal": {
+        "": "Results for nominal coreference, i.e. the mention text is \"the &lttype&gt\".",
+        "tp": "TP: True positive nominal coreferences (mention text is \"the &lttype&gt\").<br>",
+        "fp": "FP: False positive nominal coreferences (mention text is \"the &lttype&gt\").<br>",
+        "fn": "FN: False negative nominal coreferences (mention text is \"the &lttype&gt\").",
+    },
+    "precision": "Precision = TP / (TP + FP)<br>",
+    "recall": "Recall = TP / (TP + FN)<br>",
+    "f1": "F1 = 2 * (P * R) / (P + R)<br>",
 };
 
 error_category_mapping = {
@@ -98,8 +157,28 @@ mention_type_headers = {"entity": ["entity_named", "entity_other"],
                         "coref": ["nominal", "pronominal"],
                         "entity_named": ["entity_named"],
                         "entity_other": ["entity_other"],
-                        "nominal": ["nominal"],
-                        "pronominal": ["pronominal"]};
+                        "coref_nominal": ["coref_nominal"],
+                        "coref_pronominal": ["coref_pronominal"]};
+
+result_titles = {
+    "mention_types": {
+        "all": {"checkbox_label": "All", "table_heading": "All"},
+        "entity": {"checkbox_label": "Entity: All", "table_heading": "Entity: All"},
+        "entity_named": {"checkbox_label": "Entity: Named", "table_heading": "Entity: Named"},
+        "entity_other": {"checkbox_label": "Entity: Other", "table_heading": "Entity: Other"},
+        "coref": {"checkbox_label": "Coref: All", "table_heading": "Coref: All"},
+        "coref_pronominal": {"checkbox_label": "Coref: Pronominal", "table_heading": "Coref: Pronominal"},
+        "coref_nominal": {"checkbox_label": "Coref: Nominal", "table_heading": "Coref: Nominal"},
+    },
+    "error_categories": {
+        "NER": {"checkbox_label": "NER: All", "table_heading": "NER: All"},
+        "undetected": {"checkbox_label": "NER: False Negatives", "table_heading": "NER: False Negatives"},
+        "false_detection": {"checkbox_label": "NER: False Positives", "table_heading": "NER: False Positives"},
+        "wrong_disambiguation": {"checkbox_label": "Disambiguation Errors", "table_heading": "Disambiguation Errors"},
+        "other_errors": {"checkbox_label": "Other Errors", "table_heading": "Other Errors"},
+        "wrong_coreference": {"checkbox_label": "Coreference Errors", "table_heading": "Coreference Errors"},
+    }
+}
 
 $("document").ready(function() {
     read_url_parameters();
@@ -119,8 +198,6 @@ $("document").ready(function() {
     selected_rows = [];
     selected_cells = [];
     reset_selected_cell_categories();
-
-    type_name_mapping = {};
 
     $("#checkbox_compare").prop('checked', url_param_compare);
 
@@ -262,11 +339,11 @@ $("document").ready(function() {
 });
 
 function get_type_label(qid) {
-    var qid_lower = qid.toLowerCase();
-    if (qid_lower in type_name_mapping) {
-        return type_name_mapping[qid_lower];
+    var qid_upper = qid.replace("q", "Q");
+    if (qid_upper in whitelist_types) {
+        return whitelist_types[qid_upper];
     }
-    return qid + " (label missing)";
+    return qid_upper + " (label missing)";
 }
 
 function read_example_benchmark_data() {
@@ -286,7 +363,7 @@ function read_example_benchmark_data() {
 
     articles_data_example_benchmark = [];
     evaluation_cases_example_benchmark = [];
-    var promise = $.get(articles_path, function(data) {
+    $.get(articles_path, function(data) {
         lines = data.split("\n");
         for (line of lines) {
             if (line.length > 0) {
@@ -328,6 +405,11 @@ function show_example_benchmark_modal(el) {
         }
     }
 
+    // Display error explanation extracted from table header tooltip text
+    var keys = classes[1].split("-");
+    var error_explanation = header_descriptions[keys[0]][keys[1]];
+    error_explanation = error_explanation.replace(/.*<i>Numerator:<\/i> (.*)<br>.*/, "$1");
+    $("#error_explanation").text("Description: " + error_explanation);
     // Display annotated text
     var textfield = $("#example_prediction_overview tr td");
     show_annotated_text("example_annotations", $(textfield[0]), selected_category, 100, article_index, true);
@@ -631,7 +713,7 @@ function get_url_parameter(parameter_name) {
 };
 
 function is_error_cell(el) {
-    if ($(el).attr('class')) {  // System column has no class attribute
+    if ($(el).attr('class')) {  // Experiment column has no class attribute
         var classes = $(el).attr('class').split(/\s+/);
         if (classes.length > 1) {
             // The second class of a cell is its header and subheader (as class name) connected by "-"
@@ -653,21 +735,45 @@ function set_benchmark_select_options() {
     // Show loading GIF
     $("#table_loading").addClass("show");
 
-    // Retrieve file path of .results files in each folder
     benchmarks = [];
-    $.get("benchmarks", function(folder_data) {
-        $(folder_data).find("a").each(function() {
-            file_name = $(this).attr("href");
-            if (file_name.endsWith(".benchmark.jsonl")) {
-                benchmarks.push(file_name);
+    whitelist_types = {};
+
+    $.when(
+        // Read the content of the json configuration file into the config dictionary.
+        $.get(CONFIG_PATH, function(data){
+            config = data;
+        }),
+        // Read the whitelist type mapping (type QID to label)
+        $.get("whitelist_types.tsv", function(data){
+            var lines = data.split("\n");
+            for (line of lines) {
+                if (line.length > 0) {
+                    var lst = line.split("\t");
+                    var type_id = lst[0];
+                    var type_label = lst[1];
+                    whitelist_types[type_id] = type_label;
+                }
             }
-        });
-    }).then(function() {
+        }),
+        // Get the names of the benchmark files from the benchmarks directory
+        $.get("benchmarks", function(folder_data){
+            $(folder_data).find("a").each(function() {
+                var file_name = $(this).attr("href");
+                if (file_name.endsWith(".benchmark.jsonl")) {
+                    benchmarks.push(file_name);
+                }
+            });
+        })
+    ).then(function() {
         benchmarks.sort();
         for (bi in benchmarks) {
-            benchmark = benchmarks[bi];
+            var benchmark = benchmarks[bi];
             var option = document.createElement("option");
-            option.text = benchmark.replace(/(.*)\.benchmark\.jsonl/, "$1");
+            var benchmark_name = benchmark.replace(/(.*)\.benchmark\.jsonl/, "$1");
+
+            // Hide certain benchmarks as defined in the config file
+            if ("hide_benchmarks" in config && config["hide_benchmarks"].includes(benchmark_name)) continue;
+            option.text = benchmark_name;
             option.value = benchmark;
             benchmark_select.add(option);
         }
@@ -780,9 +886,13 @@ function parse_benchmark(benchmark_file, initial_call) {
     */
     // List of articles with ground truth information from the benchmark.
     articles = [];
-    if (benchmark_file.startsWith("aida") && url_param_access != "42") {
+
+    if ("obscure_aida_conll" in config && config["obscure_aida_conll"]
+        && benchmark_file.startsWith("aida") && url_param_access != "42") {
+        // Show obscured AIDA-CoNLL benchmark if specified in config and no access token is provided
         benchmark_file = benchmark_file + ".obscured";
     }
+
     $.get("benchmarks/" + benchmark_file,
         function(data, status) {
             lines = data.split("\n");
@@ -856,6 +966,9 @@ function is_correct_optional_case(eval_case) {
             if ("predicted_entity" in eval_case && eval_case.predicted_entity.entity_id == eval_case.true_entity.entity_id) {
                 // Optional TP are correct
                 return true;
+            } else if ("predicted_entity" in eval_case && eval_case.predicted_entity.entity_id == null) {
+                // GT optional and predicted entity is NIL -> correct
+                return true;
             } else if (!("predicted_entity" in eval_case)) {
                 // Optional FN are correct
                 return true;
@@ -863,6 +976,9 @@ function is_correct_optional_case(eval_case) {
         } else if ("type" in eval_case.true_entity && ["QUANTITY", "DATETIME"].includes(eval_case.true_entity.type)) {
             if ("predicted_entity" in eval_case && "type" in eval_case.predicted_entity && eval_case.true_entity.type == eval_case.predicted_entity.type) {
                 // True entity is of type QUANTITY or DATETIME and predicted entity is of the same type -> correct TP
+                return true;
+            } else if ("predicted_entity" in eval_case && eval_case.predicted_entity.entity_id == null) {
+                // True entity is of type QUANTITY or DATETIME and predicted entity is NIL -> correct
                 return true;
             } else if (!("predicted_entity" in eval_case)) {
                 // True entity is of type QUANTITY or DATETIME and no entity was predicted -> correct FN
@@ -970,8 +1086,29 @@ function get_annotations(article_index, approach_name, column_idx, example_bench
     var annotation_count = 0;
     for (mention of mentions) {
         if (mention.factor == 0) {
-            // Do not display overlapping mentions
+            // Do not display overlapping GT mentions
             continue;
+        }
+
+        // Do not display overlapping predictions: Keep the larger one.
+        // Assume that predictions are sorted by span start (but not by span end)
+        if ("predicted_entity" in mention || (!("predicted_entity" in mention) && !("true_entity" in mention))) {
+            // Includes mentions with "predicted_entity" but also mentions outside of the evaluation span
+            // with neither "true_entity" nor "predicted_entity"
+            var last_index = prediction_spans.length - 1;
+            if (prediction_spans.length > 0 && prediction_spans[last_index][1] > mention.span[0]) {
+                // Overlap detected.
+                var previous_span_length = prediction_spans[last_index][1] - prediction_spans[last_index][0];
+                var current_span_length = mention.span[1] - mention.span[0];
+                if (previous_span_length >= current_span_length) {
+                    // Previous span is longer than current span so discard current prediction
+                    continue
+                } else {
+                    delete annotations[prediction_spans[last_index]];
+                    prediction_spans.splice(-1);
+                }
+            }
+            prediction_spans.push(mention.span);
         }
 
         var gt_annotation = {};
@@ -979,30 +1116,11 @@ function get_annotations(article_index, approach_name, column_idx, example_bench
 
         // mention is an evaluated case
         if ("predicted_entity" in mention || "true_entity" in mention) {
-            // Avoid overlapping prediction_spans: Keep the larger one.
-            // Assume that predictions are sorted by span start (but not by span end)
-            if ("predicted_entity" in mention) {
-                var last_index = prediction_spans.length - 1;
-                if (prediction_spans.length > 0 && prediction_spans[last_index][1] > mention.span[0]) {
-                    // Overlap detected.
-                    var previous_span_length = prediction_spans[last_index][1] - prediction_spans[last_index][0];
-                    var current_span_length = mention.span[1] - mention.span[0];
-                    if (previous_span_length >= current_span_length) {
-                        // Previous span is longer than current span so discard current prediction
-                        continue
-                    } else {
-                        delete annotations[prediction_spans[last_index]];
-                        prediction_spans.splice(-1);
-                    }
-                }
-                prediction_spans.push(mention.span);
-            }
-
             if ("true_entity" in mention && mention.true_entity.entity_id.startsWith("Unknown")) {
                 // GT entity is NIL
                 gt_annotation.class = ANNOTATION_CLASS_UNKNOWN;
                 if ("predicted_entity" in mention) {
-                    pred_annotation.class = ANNOTATION_CLASS_FP;
+                    pred_annotation.class = (mention.predicted_entity.entity_id == null) ? ANNOTATION_CLASS_UNKNOWN : ANNOTATION_CLASS_FP;
                 }
             } else if (is_correct_optional_case(mention)) {
                 gt_annotation.class = ANNOTATION_CLASS_OPTIONAL;
@@ -1018,16 +1136,12 @@ function get_annotations(article_index, approach_name, column_idx, example_bench
                         pred_annotation.class = ANNOTATION_CLASS_TP;
                     } else {
                         // predicted the wrong entity
-                        pred_annotation.class = ANNOTATION_CLASS_FP;
-                        if (is_optional_case(mention)) {
-                            gt_annotation.class = ANNOTATION_CLASS_OPTIONAL;
-                        } else {
-                            gt_annotation.class = ANNOTATION_CLASS_FN;
-                        }
+                        pred_annotation.class = (mention.predicted_entity.entity_id == null) ? ANNOTATION_CLASS_UNKNOWN : ANNOTATION_CLASS_FP;
+                        gt_annotation.class = (is_optional_case(mention)) ? ANNOTATION_CLASS_OPTIONAL : ANNOTATION_CLASS_FN;
                     }
                 } else {
                     // wrong span
-                    pred_annotation.class = ANNOTATION_CLASS_FP;
+                    pred_annotation.class = (mention.predicted_entity.entity_id == null) ? ANNOTATION_CLASS_UNKNOWN : ANNOTATION_CLASS_FP;
                 }
             } else {
                 gt_annotation.class = ANNOTATION_CLASS_FN;
@@ -1222,11 +1336,16 @@ function generate_annotation_html(snippet, annotation, selected_cell_category, p
     } else if (annotation.class == ANNOTATION_CLASS_TP && annotation.gt_entity_id) {
         tooltip_classes += " below";
     } else {
-        if (annotation.pred_entity_id) {
-            var entity_name = (["Unknown", "null"].includes(annotation.pred_entity_name)) ? MISSING_LABEL_TEXT : annotation.pred_entity_name;
-            var wikidata_url = "https://www.wikidata.org/wiki/" + annotation.pred_entity_id;
-            var entity_link = "<a href=\"" + wikidata_url + "\" target=\"_blank\">" + annotation.pred_entity_id + "</a>";
-            tooltip_header_text += "Prediction: " + entity_name + " (" + entity_link + ")";
+        if ("pred_entity_id" in annotation) {
+            if (annotation.pred_entity_id) {
+                var entity_name = (["Unknown", "null"].includes(annotation.pred_entity_name)) ? MISSING_LABEL_TEXT : annotation.pred_entity_name;
+                var wikidata_url = "https://www.wikidata.org/wiki/" + annotation.pred_entity_id;
+                var entity_link = "<a href=\"" + wikidata_url + "\" target=\"_blank\">" + annotation.pred_entity_id + "</a>";
+                tooltip_header_text += "Prediction: " + entity_name + " (" + entity_link + ")";
+            } else {
+                // NIL prediction
+                tooltip_header_text += "Prediction: " + NIL_PREDICTION_TEXT;
+            }
         }
         if (annotation.gt_entity_id ) {
             if (tooltip_header_text) { tooltip_header_text += "<br>"; }
@@ -1263,7 +1382,7 @@ function generate_annotation_html(snippet, annotation, selected_cell_category, p
         tooltip_classes += " " + annotation.class;
     }
     if (annotation.predicted_by) tooltip_body_text += "Predicted by " + annotation.predicted_by + "<br>";
-    if (annotation.pred_entity_type) {
+    if (![ANNOTATION_CLASS_UNEVALUATED, ANNOTATION_CLASS_UNKNOWN].includes(annotation.class) && annotation.pred_entity_type) {
         var type_string = $.map(annotation.pred_entity_type.split("|"), function(qid){ return get_type_label(qid) }).join(", ");
         tooltip_body_text += "Types: " + type_string + "<br>";
     }
@@ -1432,22 +1551,23 @@ async function show_article(selected_approaches, timestamp) {
 
     var iteration = 0;
     while (!(selected_approaches[0] in evaluation_cases) || evaluation_cases[selected_approaches[0]].length == 0) {
+        $(column_headers[column_idx]).text("");
+        for (var i=1; i<columns.length; i++) {
+            hide_table_column("prediction_overview", i);
+        }
         if (iteration >= 10) {
             console.log("ERROR: Stop waiting for result.");
-            $(columns[column_idx]).html("<b class='warning'>No approach selected or no file with cases found.</b>");
+            $(columns[column_idx]).html("<b class='warning'>No experiment selected or no file with cases found.</b>");
             return;
         } else if (timestamp < last_show_article_request_timestamp) {
             console.log("ERROR: Stop waiting for result.");
             return;
+        } else if (!selected_approaches[0]) {
+            $(columns[column_idx]).html("<b class='warning'>No experiment selected in the evaluation results table.</b>");
+            return;
         }
         console.log("WARNING: selected approach[0]", selected_approaches[0], "not in evaluation cases. Waiting for result.");
-        $(column_headers[column_idx]).text("");
         $(columns[column_idx]).html("<b>Waiting for results...</b>");
-        column_idx++;
-        for (var i=column_idx; i<columns.length; i++) {
-            hide_table_column("prediction_overview", i);
-        }
-        column_idx = 0;
         await new Promise(r => setTimeout(r, 1000));
         iteration++;
     }
@@ -1493,7 +1613,7 @@ function get_emphasis_string(selected_cell_category) {
         var emphasis_strs = [];
         for (selected_category of selected_cell_category) {
             if (is_type_string(selected_category)) {
-                 emphasis_strs.push(type_name_mapping[selected_category]);
+                 emphasis_strs.push(get_type_label(selected_category));
                  emphasis_type = "entity type";
             } else if (mention_types.includes(selected_category)) {
                 emphasis_strs.push(selected_category.replace(/_/g, " ").toLowerCase());
@@ -1546,6 +1666,25 @@ function build_overview_table(benchmark_name, default_selected_systems, default_
                     // Remove the benchmark extension from the approach name
                     if (approach_name.endsWith("." + benchmark_name)) approach_name = approach_name.substring(0, approach_name.lastIndexOf("."))
                     result_files[approach_name] = url.substring(0, url.length - RESULTS_EXTENSION.length);
+
+                    // Filter out certain keys in results according to config
+                    $.each(results["error_categories"], function(key) {
+                        if ("hide_error_checkboxes" in config && config["hide_error_checkboxes"].includes(key))
+                            delete results["error_categories"][key];
+                    });
+                    $.each(results["entity_types"], function(key) {
+                        var type_label = key.toLowerCase().replace(/Q[0-9]+:/g, "");
+                        type_label = type_label.replace(" ", "_");
+                        if ("hide_type_checkboxes" in config && (config["hide_type_checkboxes"].includes(key) ||
+                                                                 config["hide_type_checkboxes"].includes(type_label)))
+                            delete results["entity_types"][key];
+                    });
+                    $.each(results, function(key) {
+                        if ("hide_mention_checkboxes" in config && config["hide_mention_checkboxes"].includes(key))
+                            delete results[key];
+                    });
+
+                    // Add results for approach to array
                     result_array.push([approach_name, results]);
                 });
             })).then(function() {
@@ -1635,25 +1774,21 @@ function add_checkboxes(json_obj, initial_call) {
     Add checkboxes for showing / hiding columns.
     */
     $.each(json_obj, function(key) {
-        if (key == "by_type" || key == "errors") {
-            $.each(json_obj[key], function(subkey) {
-                var class_name = get_class_name(subkey);
-                var title = get_title_from_key(subkey);
-                var checked = (url_param_show_columns.includes(class_name)) ? "checked" : ""
-                var checkbox_html = "<span><input type=\"checkbox\" class=\"checkbox_" + class_name + "\" onchange=\"on_column_checkbox_change(this, true)\" " + checked + ">";
-                checkbox_html += "<label>" + title + "</label></span>\n";
-                var checkbox_div_id = (key == "errors") ? "error_checkboxes" : "type_checkboxes";
-                $("#" + checkbox_div_id + ".checkboxes").append(checkbox_html);
-                if (key == "by_type") type_name_mapping[get_type_qid(subkey).toLowerCase()] = title;
-            });
-        } else {
-            var class_name = get_class_name(key);
-            var title = get_title_from_key(key);
-            var checked = ((class_name == "all" && url_param_show_columns.length == 0) || url_param_show_columns.includes(class_name)) ? "checked" : ""
+        $.each(json_obj[key], function(subkey) {
+            var class_name = get_class_name(subkey);
+            var title = get_checkbox_label(key, subkey);
+            var checked = ((class_name == "all" && url_param_show_columns.length == 0) || url_param_show_columns.includes(class_name)) ? "checked" : "";
             var checkbox_html = "<span><input type=\"checkbox\" class=\"checkbox_" + class_name + "\" onchange=\"on_column_checkbox_change(this, true)\" " + checked + ">";
-            checkbox_html += "<label>" + title + "</label></span>\n";
-            $("#general_checkboxes.checkboxes").append(checkbox_html);
-        }
+            checkbox_html += "<label>" + title;
+            var tooltip_text = get_header_tooltip_text(subkey, "");
+            if (tooltip_text) checkbox_html += "<span class='tooltiptext'>" + tooltip_text + "</span>";
+            checkbox_html += "</label></span>\n";
+            var checkbox_div_id = "";
+            if (key == "mention_types") checkbox_div_id = "mention_type_checkboxes";
+            if (key == "error_categories") checkbox_div_id = "error_category_checkboxes";
+            if (key == "entity_types") checkbox_div_id = "entity_type_checkboxes";
+            $("#" + checkbox_div_id + ".checkboxes").append(checkbox_html);
+        });
     });
 }
 
@@ -1696,48 +1831,31 @@ function get_table_header(json_obj) {
     Get html for the table header.
     */
     var first_row = "<tr><th onclick='produce_latex()' class='produce_latex'>" + copy_latex_text + "</th>";
-    var second_row = "<tr><th>System</th>";
+    var second_row = "<tr><th>Experiment</th>";
     $.each(json_obj, function(key) {
-        if (key == "by_type" || key == "errors") {
-            $.each(json_obj[key], function(subkey) {
-                var row_additions = get_table_header_by_json_key(json_obj[key], subkey);
-                first_row += row_additions[0];
-                second_row += row_additions[1];
+        $.each(json_obj[key], function(subkey) {
+            var colspan = 0;
+            var class_name = get_class_name(subkey);
+            $.each(json_obj[key][subkey], function(subsubkey) {
+                if (!(ignore_headers.includes(subsubkey))) {
+                    var subclass_name = get_class_name(subsubkey);
+                    var sort_order = (subkey in error_category_mapping) ? " data-sortinitialorder=\"asc\"" : "";
+                    second_row += "<th class='" + class_name + " " + class_name + "-" + subclass_name + " tooltip sorter-digit'" + sort_order + ">" + get_table_heading(subkey, subsubkey);
+                    var tooltip_text = get_header_tooltip_text(subkey, subsubkey);
+                    if (tooltip_text) second_row += "<span class='tooltiptext'>" + tooltip_text + "</span>";
+                    second_row += "</th>";
+                    colspan += 1;
+                }
             });
-        } else {
-            var row_additions = get_table_header_by_json_key(json_obj, key);
-            first_row += row_additions[0];
-            second_row += row_additions[1];
-        }
+            first_row += "<th colspan=\"" + colspan + "\" class='" + class_name + " tooltip'>" + get_table_heading(key, subkey);
+            var tooltip_text = get_header_tooltip_text(subkey, "");
+            if (tooltip_text) first_row += "<span class='tooltiptext'>" + tooltip_text + "</span>";
+            first_row += "</th>";
+        });
     });
     first_row += "</tr>";
     second_row += "</tr>";
     return first_row + second_row;
-}
-
-function get_table_header_by_json_key(json_obj, key) {
-    var first_row_addition = "";
-    var second_row_addition = "";
-    var colspan = 0;
-    var class_name = get_class_name(key);
-    $.each(json_obj[key], function(subkey) {
-        if (!(ignore_headers.includes(subkey))) {
-            var subclass_name = get_class_name(subkey);
-            var sort_order = (key in error_category_mapping) ? " data-sortinitialorder=\"asc\"" : "";
-            second_row_addition += "<th class='" + class_name + " " + class_name + "-" + subclass_name + " tooltip sorter-digit'" + sort_order + ">" + get_title_from_key(subkey);
-            var tooltip_text = get_header_tooltip_text(key, subkey);
-            if (tooltip_text) second_row_addition += "<span class='tooltiptext'>" + tooltip_text + "</span>";
-            second_row_addition += "</th>";
-            colspan += 1;
-        }
-    });
-    first_row_addition += "<th colspan=\"" + colspan + "\" class='" + class_name + " tooltip'>" + get_title_from_key(key);
-    var tooltip_text = get_header_tooltip_text(key, null);
-    if (tooltip_text) {
-        first_row_addition += "<span class='tooltiptext'>" + tooltip_text + "</span>";
-    }
-    first_row_addition += "</th>";
-    return [first_row_addition, second_row_addition];
 }
 
 function get_table_row(approach_name, json_obj) {
@@ -1748,13 +1866,9 @@ function get_table_row(approach_name, json_obj) {
     var onclick_str = " onclick='on_cell_click(this)'";
     row += "<td " + onclick_str + ">" + approach_name + "</td>";
     $.each(json_obj, function(key) {
-        if (key == "by_type" || key == "errors") {
-            $.each(json_obj[key], function(subkey) {
-                row += get_table_row_by_json_key(json_obj[key], subkey, onclick_str);
-            });
-        } else {
-            row += get_table_row_by_json_key(json_obj, key, onclick_str);
-        }
+        $.each(json_obj[key], function(subkey) {
+            row += get_table_row_by_json_key(json_obj[key], subkey, onclick_str);
+        });
     });
     row += "</tr>";
     return row;
@@ -1816,15 +1930,55 @@ function get_tooltip_text(json_obj) {
 
 function get_header_tooltip_text(key, subkey) {
     if (key in header_descriptions) {
-        if (subkey) {
+        if (typeof header_descriptions[key] == "string") {
+            return header_descriptions[key];
+        }
+        if (subkey in header_descriptions[key]) {
             var tooltip_text = header_descriptions[key][subkey];
-            if (subkey != "all") {
+            if (!["", "all"].includes(subkey)) {
                 tooltip_text += tooltip_example_html;
             }
             return tooltip_text;
+        } else {
+            var tp_string = header_descriptions[key]["tp"];
+            var fp_string = header_descriptions[key]["fp"];
+            var fn_string = header_descriptions[key]["fn"];
+            var string = header_descriptions[subkey];
+            if (subkey == "precision") {
+                string += tp_string;
+                string += fn_string;
+            } else if (subkey == "recall") {
+                string += tp_string;
+                string += fn_string;
+            } else if (subkey == "f1") {
+                string += tp_string;
+                string += fp_string;
+                string += fn_string;
+            }
+            return string;
         }
-        if (typeof header_descriptions[key] == "string") {
-            return header_descriptions[key];
+    } else if (key in whitelist_types || key.toLowerCase() == "other") {
+        var type = (key in whitelist_types) ? whitelist_types[key] : "other";
+        if (subkey) {
+            // Get tooltips for precision, recall and f1
+            var tp_string = "TP: True Positives of type " + type + "<br>";
+            var fp_string = "FP: False Positives of type " + type + "<br>";
+            var fn_string = "FN: False Negatives of type " + type + "<br>";
+            var string = header_descriptions[subkey];
+            if (subkey == "precision") {
+                string += tp_string;
+                string += fp_string;
+            } else if (subkey == "recall") {
+                string += tp_string;
+                string += fn_string;
+            } else if (subkey == "f1") {
+                string += tp_string;
+                string += fp_string;
+                string += fn_string;
+            }
+            return string;
+        } else {
+            return "Results for entities of type \"" + type + "\".";
         }
     }
     return "";
@@ -1834,9 +1988,24 @@ function get_class_name(text) {
     return text.toLowerCase().replace(/[ ,.#:]/g, "_");
 }
 
-function get_title_from_key(key) {
-    key = key.replace(/Q[0-9]+:/g, "");
-    return to_title_case(key.replace(/_/g, " "));
+function get_checkbox_label(key, subkey) {
+    if (key == "entity_types" && subkey in whitelist_types) {
+        return whitelist_types[subkey];
+    } else if (key in result_titles && subkey in result_titles[key]) {
+        return result_titles[key][subkey]["checkbox_label"];
+    } else {
+        return to_title_case(subkey.replace(/_/g, " "));
+    }
+}
+
+function get_table_heading(key, subkey) {
+    if (key == "entity_types" && subkey in whitelist_types) {
+        return "Type: " + whitelist_types[subkey];
+    } else if (key in result_titles && subkey in result_titles[key]) {
+        return result_titles[key][subkey]["table_heading"];
+    } else {
+        return to_title_case(subkey.replace(/_/g, " "));
+    }
 }
 
 function to_title_case(str) {
@@ -2010,7 +2179,7 @@ function on_cell_click(el) {
     }
 
     // Make new selection
-    var classes = ($(el).attr('class')) ? $(el).attr('class').split(/\s+/) : [];  // System column has no class attribute
+    var classes = ($(el).attr('class')) ? $(el).attr('class').split(/\s+/) : [];  // Experiment column has no class attribute
     if (is_error_cell(el)) {
         $(el).addClass("selected");
         selected_cells.push(el);
@@ -2191,7 +2360,7 @@ function produce_latex() {
                 if (colspan) {
                     // First column header is skipped here, so starting with "&" works
                     header_string += "& \\multicolumn{" + colspan + "}{c}{\\textbf{" + title + "}} ";
-                } else if (title && title != "System" && title != copy_latex_text) {
+                } else if (title && title != "Experiment" && title != copy_latex_text) {
                     header_string += "& \\textbf{" + title + "} ";
                 }
             }

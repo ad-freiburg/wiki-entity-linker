@@ -63,34 +63,43 @@ a {
 /* Class for warnings */
 .warning {
     color: red;
-    font-site: 120%;
 }
 
 .nonbold {
     font-weight: 300;
 }
 
-/* Checkbox labels */
-label {
-    padding-right: 1em;
-    padding-left: 2px;
+.with_note {
+    margin-bottom: 2px;
+    padding-bottom: 0px;
 }
 
-/* Checkboxes for showing / hiding table columns */
-.checkboxes {
-    padding: 0;
-    margin: 0;
-    margin-bottom: 1em;
+.note {
+    font-size: 80%;
+    margin-top: 0em;
+    margin-bottom: 0em;
 }
 
-.checkboxes span {
-    white-space: nowrap;
-}
+/* Class for tooltips in the evaluation results box */
+#evaluation_overview .tooltiptext {
+    visibility: hidden;
+    background-color: white;
+    text-align: left;
+    padding: 5px;
+    border-radius: 6px;
+    border: 2px solid lightgrey;
+    line-height: 120%;
+    max-width: 20em;
+    min-width: 10em;
+    font-size: 80%;
+    white-space: normal;
+    z-index: 30;
 
-#checkbox_table td:first-child {
-    white-space: nowrap;
-    vertical-align: top;
-    padding-right: 1em;
+    /* Tooltip position */
+    position: absolute;
+    left: 0;
+    right: auto;
+    bottom: 100%;
 }
 
 .tooltip,
@@ -114,6 +123,42 @@ label {
     justify-content: space-between; /* Put left child at the left end and right child at the right end */
 }
 
+/* ----------------------------------------- */
+/* Begin checkboxes for showing / hiding table columns */
+#checkbox_table {
+    margin-top: 2em;
+}
+
+#checkbox_table td:first-child {
+    white-space: nowrap;
+    vertical-align: top;
+    padding-right: 1em;
+}
+
+.checkboxes {
+    padding: 0;
+    margin: 0;
+    margin-bottom: 1em;
+}
+
+.checkboxes span {
+    white-space: nowrap;
+}
+
+.checkboxes label {
+    position: relative;
+    padding-right: 1em;
+    padding-left: 2px;
+}
+
+#evaluation_overview label .tooltiptext {
+    /* Make the tooltip non-reachable so it doesn't get in the way */
+    bottom: 120%;
+}
+
+#evaluation_overview label:hover .tooltiptext {
+    visibility: visible;
+}
 
 /* ----------------------------------------- */
 /* Begin evaluation results table  */
@@ -203,16 +248,7 @@ label {
 /* Begin table tooltips */
 
 /* Tooltip text */
-table .tooltip .tooltiptext {
-    visibility: hidden;
-    background-color: white;
-    text-align: left;
-    padding: 5px;
-    border-radius: 6px;
-    border: 2px solid lightgrey;
-    line-height: 120%;
-    z-index: 30;
-
+#evaluation_table_wrapper .tooltip .tooltiptext {
     /* Position of the tooltip. Left and top are set dynamically because due to
     overflow != visible in the containing div the position of the tooltips must
     be fixed instead of absolute so they are not cut off */
@@ -222,20 +258,20 @@ table .tooltip .tooltiptext {
 }
 
 /* Show the tooltip text when you mouse over the tooltip container */
-table .tooltip:hover .tooltiptext {
+#evaluation_table_wrapper .tooltip:hover .tooltiptext {
     visibility: visible;
 }
 
 /* Show the tooltip text when you mouse over a table header cell that comes with a description */
 #evaluation_table_wrapper th .tooltiptext {
-    max-width: 20em;
-    font-size: 0.8em;
     font-weight: 300;
 }
 
 /* Cell tooltip for precision / recall / F1 cells */
 #evaluation_table_wrapper td .tooltiptext {
     width: 5em;
+    min-width: 5em;
+    font-size: 1em;
 }
 
 /* ----------------------------------------- */
@@ -428,6 +464,12 @@ div.latex textarea {
 .annotation.fp.lowlight {
     background-color: var(--annotation-fp-color-lowlight);
 }
+.annotation.pred.unknown {
+    background-color: var(--annotation-unknown-color);
+}
+.annotation.pred.unknown.lowlight {
+    background-color: var(--annotation-unknown-color-lowlight);
+}
 .annotation.fn {
     border-bottom: var(--annotation-border-size) solid var(--annotation-fp-color);
 }
@@ -572,7 +614,13 @@ div.latex textarea {
 }
 
 #example_prediction_overview {
-    padding: 5% 10%;
+    padding: 5% 10% 2% 10%;
+}
+
+#error_explanation {
+    padding: 0% 10%;
+    text-align: center;
+    font-style: italic;
 }
 
 /* ----------------------------------------- */

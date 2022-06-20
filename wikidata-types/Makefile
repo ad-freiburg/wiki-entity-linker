@@ -15,14 +15,14 @@ PORT = 7016
 
 API_WIKIDATA = https://qlever.cs.uni-freiburg.de/api/wikidata
 CORRECTIONS_FILE = corrections.txt
-TYPES_FILE = types.txt
+TYPES_FILE = types.tsv
 ENTITY_TYPES_FILE = entity-types.tsv
 # DATA_QUERY_NAMES = P279 P31
 DATA_QUERY_NAMES = P279 P31 LABEL SITELINKS
 
 BATCH_SIZE = 10000000
 MAX_RESULT_SIZE = $(shell echo "200 * $(BATCH_SIZE)" | bc)
-TYPES_WHITELIST = $(shell cat types.txt | sed 's/\s*\#.*$$//g')
+TYPES_WHITELIST = $(shell cat $(TYPES_FILE) | sed -r 's/(Q[0-9]*)\s*.*/wd:\1/g')
 SED_PREFIX_SUBSTITUTIONS = $(shell echo "$(PREFIXES)" | sed 's|\([.]\)|\\\1|g; s/PREFIX \+\([^ ]\+\) \+<\([^ ]\+\)>/s|<\2|\1|g; /g;')
 
 # Variants of getting the contents of a variable with a multiline value (see the
@@ -167,6 +167,7 @@ query.batched:
 # NOTE: Here is a short description of what each of the five sed lines does.
 # Test with  make DATA_QUERY_NAMES=TEST getdata && head TEST.ttl
 #
+# 0. Drop lines that start with ? (first line with column names)
 # 1. Add TAB and . at the end and TAB before ^^ and @
 # 2. Remove language prefixes (@en@) ... see comment below
 # 3. Replace prefixes from $(PREFIXES) by their short name (it's magic)
@@ -179,6 +180,7 @@ query:
 	@curl -Gs $(API) \
 	    --data-urlencode "query=$$PREFIXES $(QUERY)" \
 	    --data-urlencode "action=tsv_export" \
+	    | sed -r '/^[?]/d' \
 	    | sed 's/$$/\t./; s/\^\^<\([^>]\+\)>\t/\t^^<\1>\t/g; s/"\(@[a-z]\+\)\t/"\t\1\t/g' \
 	    | sed 's/\t@[a-z]\+@/\t/g' \
 	    | sed '$(SED_PREFIX_SUBSTITUTIONS)' \

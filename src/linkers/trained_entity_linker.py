@@ -1,9 +1,8 @@
 import logging
-from typing import Dict, Tuple, List, Optional
+from typing import Dict, Tuple, List, Optional, Any
 
 import spacy
 from spacy.tokens import Doc
-from spacy.language import Language
 from spacy.vocab import Vocab
 from spacy.kb import KnowledgeBase, Candidate
 
@@ -25,23 +24,24 @@ logger = logging.getLogger("main." + __name__.split(".")[-1])
 
 
 class TrainedEntityLinker(AbstractEntityLinker):
-    LINKER_IDENTIFIER = "VANILLA_LOCAL_LINKER"
+    def __init__(self, entity_database: EntityDatabase, config: Dict[str, Any]):
+        self.model = spacy.load(settings.LARGE_MODEL_NAME)
 
-    def __init__(self,
-                 linker_model: NeuralNet,
-                 entity_db: EntityDatabase,
-                 model: Optional[Language] = None,
-                 kb_name: Optional[str] = None,
-                 prior: Optional[bool] = False,
-                 global_model: Optional[bool] = False,
-                 rdf2vec: Optional[bool] = False):
-        if model is None:
-            self.model = spacy.load(settings.LARGE_MODEL_NAME)
-        else:
-            self.model = model
+        # Get config variables
+        self.linker_identifier = config["name"] if "name" in config else "NeuralNetwork"
+        self.ner_identifier = "EnhancedSpacy"
+        kb_name = config["kb"] if "kb" in config else None
+        linker_model_path = config["model_path"] if "model_path" in config else None
+
+        logger.info("Loading entity linking model...")
+        model_dict = torch.load(linker_model_path)
+        self.prior = model_dict.get('prior', False)
+        self.global_model = model_dict.get('global_model', False)
+        rdf2vec = model_dict.get('rdf2vec', False)
+        self.linker_model = model_dict['model']
 
         if not self.model.has_pipe("ner_postprocessor"):
-            ner_postprocessor = NERPostprocessor(entity_db)
+            ner_postprocessor = NERPostprocessor(entity_database)
             self.model.add_pipe(ner_postprocessor, name="ner_postprocessor", after="ner")
 
         logger.info("Loading knowledge base...")
@@ -56,13 +56,10 @@ class TrainedEntityLinker(AbstractEntityLinker):
         self.kb = KnowledgeBase(vocab=vocab)
         self.kb.load_bulk(kb_path)
 
-        self.linker_model = linker_model
         self.linker_model.eval()
 
-        self.prior = prior
-        self.global_model = global_model
-        logger.info(f"Use prior probabilities: {prior}")
-        logger.info(f"Use a global model: {global_model}")
+        logger.info(f"Use prior probabilities: {self.prior}")
+        logger.info(f"Use a global model: {self.global_model}")
         logger.info(f"Use RDF2Vec as entity vectors: {rdf2vec}")
 
         # Load rdf2vec model

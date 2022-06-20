@@ -5,17 +5,12 @@ class Linkers(Enum):
     BASELINE = "baseline"
     SPACY = "spacy"
     EXPLOSION = "explosion"
-    AMBIVERSE = "ambiverse"
     TAGME = "tagme"
-    WEXEA = "wexea"
     TRAINED_MODEL = "trained_model"
-    SIMPLE_JSONL = "simple_jsonl"
     BERT_MODEL = "bert_model"
     POPULAR_ENTITIES = "popular_entities"
-    WIKIFIER = "wikifier"
-    PURE_PRIOR = "pure_prior"
     POS_PRIOR = "pos_prior"
-    NIF = "nif"
+    DBPEDIA_SPOTLIGHT = "dbpedia_spotlight"
     NONE = "none"
 
 
@@ -30,4 +25,12 @@ class CoreferenceLinkers(Enum):
     STANFORD = "stanford"
     XRENNER = "xrenner"
     HOBBS = "hobbs"
+    WEXEA = "wexea"
+
+
+class PredictionFormats(Enum):
+    NIF = "nif"
+    SIMPLE_JSONL = "simple_jsonl"
+    AMBIVERSE = "ambiverse"
+    WIKIFIER = "wikifier"
     WEXEA = "wexea"
