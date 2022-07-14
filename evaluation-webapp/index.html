@@ -4,6 +4,9 @@
 		<meta charset="UTF-8">
 		<link rel="stylesheet" type="text/css" href="style.css">
 		<link rel="stylesheet" type="text/css" href="https://mottie.github.io/tablesorter/dist/css/theme.default.min.css">
+		<link rel="stylesheet" type="text/css" href="https://unpkg.com/tippy.js@6/themes/light-border.css"/>
+		<script src="https://unpkg.com/@popperjs/core@2/dist/umd/popper.min.js"></script>
+		<script src="https://unpkg.com/tippy.js@6/dist/tippy-bundle.umd.js"></script>
 		<script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
 		<script type="text/javascript" src="bootstrap/js/bootstrap.js"></script>
 		<script type="text/javascript" src="https://mottie.github.io/tablesorter/dist/js/jquery.tablesorter.min.js"></script>
@@ -63,14 +66,14 @@
 
 		<div id="evaluation_overview" class="content_box">
 			<h3 class="with_note">Evaluation results</h3>
-			<p class="note">Select a checkbox to show evaluation results for that category.</p>
-			<p class="note">Hover over a checkbox label for an explanation of the category.</p>
+			<p class="note">Select a checkbox to show evaluation results for that category. Hover over a checkbox label for an explanation of the category.</p>
 			<div id="checkbox_table_wrapper">
 				<table id="checkbox_table">
 					<tbody>
 						<tr><td><b>Mention types:</b></td><td><div id="mention_type_checkboxes" class="checkboxes"></div></td></tr>
 						<tr><td><b>Error categories:</b></td><td><div id="error_category_checkboxes" class="checkboxes"></div></td></tr>
 						<tr><td><b>Entity types:</b></td><td><div id="entity_type_checkboxes" class="checkboxes"></div></td></tr>
+						<tr><td><b>Evaluation mode:</b></td><td><div id="evaluation_modes" class="checkboxes"></div></td></tr>
 					</tbody>
 				</table>
 			</div>

@@ -7,11 +7,11 @@ ANNOTATION_CLASS_UNKNOWN = "unknown";
 ANNOTATION_CLASS_OPTIONAL = "optional";
 ANNOTATION_CLASS_UNEVALUATED = "unevaluated";
 
-RESULTS_EXTENSION = ".results";
+RESULTS_EXTENSION = ".eval_results.json";
 EVALUATION_RESULT_PATH = "evaluation-results";
 
 EXAMPLE_BENCHMARK_PATH = "example-benchmark/error-category-examples.benchmark.jsonl";
-EXAMPLE_BENCHMARK_RESULTS_PATH = "example-benchmark/example.error-category-examples.results";
+EXAMPLE_BENCHMARK_RESULTS_PATH = "example-benchmark/example.error-category-examples.eval_results.json";
 
 MAX_SELECTED_APPROACHES = 2;
 MAX_CACHED_FILES = 15;
@@ -24,97 +24,102 @@ ignore_headers = ["true_positives", "false_positives", "false_negatives", "groun
 percentage_headers = ["precision", "recall", "f1"];
 copy_latex_text = "Copy LaTeX code for table";
 
-tooltip_example_html = "<br><a href=\"#example_benchmark_modal\"onclick=\"show_example_benchmark_modal(this)\" data-toggle=\"modal\" data-target=\"#example_benchmark_modal\">For an example click here</a>.";
+tooltip_example_html = "<p><a href=\"#example_benchmark_modal\"onclick=\"show_example_benchmark_modal(this)\" data-toggle=\"modal\" data-target=\"#example_benchmark_modal\">For an example click here</a>.</p>";
 header_descriptions = {
     "undetected": {
         "": "Errors involving undetected mentions.",
-        "all": "<i>Numerator:</i> A ground truth mention span is not linked to an entity.<br><i>Denominator:</i> All ground truth entity mentions.",
-        "lowercase": "<i>Numerator:</i> Undetected lowercased ground truth mention.<br><i>Denominator:</i> All lowercased ground truth mentions.",
-        "partially_included": "<i>Numerator:</i> A part of the ground truth mention is linked to an entity.<br><i>Denominator:</i> All ground truth mentions consisting of multiple words.",
-        "partial_overlap": "<i>Numerator:</i> Undetected mention that overlaps with a predicted mention.<br><i>Denominator:</i> All ground truth mentions that are not lowercased.",
-        "other": "<i>Numerator:</i> Undetected mention that does not fall into any of the other categories.<br><i>Denominator:</i> All ground truth mentions that are not lowercased."
+        "all": "<p><i>Numerator:</i> A ground truth mention span is not linked to an entity.</p><p><i>Denominator:</i> All ground truth entity mentions.</p>",
+        "lowercase": "<p><i>Numerator:</i> Undetected lowercased ground truth mention.</p><p><i>Denominator:</i> All lowercased ground truth mentions.</p>",
+        "partially_included": "<p><i>Numerator:</i> A part of the ground truth mention is linked to an entity.</p><p><i>Denominator:</i> All ground truth mentions consisting of multiple words.</p>",
+        "partial_overlap": "<p><i>Numerator:</i> Undetected mention that overlaps with a predicted mention.</p><p><i>Denominator:</i> All ground truth mentions that are not lowercased.</p>",
+        "other": "<p><i>Numerator:</i> Undetected mention that does not fall into any of the other categories.</p><p><i>Denominator:</i> All ground truth mentions that are not lowercased.</p>"
     },
     "false_detection": {
         "": "Errors involving false detections.",
         "all": "A mention is predicted whose span is not linked in the ground truth.",
-        "abstract_entity": "The predicted mention is lowercased and does not overlap with a ground truth mention.",
-        "unknown_entity": "The predicted mention is uppercased and the ground truth is \"Unknown\".",
+        "lowercased": "The predicted mention is lowercased and does not overlap with a ground truth mention.",
+        "groundtruth_unknown": "The predicted mention is uppercased and the ground truth is \"Unknown\".",
         "other": "NER false positive that does not fall into any of the other categories.",
-        "wrong_span": "<i>Numerator:</i> The predicted mention overlaps with a ground truth mention of the same entity, but the spans do not match exactly.<br><i>Denominator</i>: All predicted mentions."
+        "wrong_span": "<p><i>Numerator:</i> The predicted mention overlaps with a ground truth mention of the same entity, but the spans do not match exactly.</p><p><i>Denominator</i>: All predicted mentions.</p>"
     },
     "wrong_disambiguation": {
         "": "NER true positives where a wrong entity was linked.",
-        "all": "<i>Numerator:</i> A ground truth span was detected, but linked to the wrong entity.<br><i>Denominator:</i> All NER true positives.",
-        "demonym": "<i>Numerator:</i> FP & FN and the mention text is a demonym, i.e. it is contained in a list of demonyms from Wikidata.<br><i>Denominator:</i> NER true positives where the mention text is a demonym.",
-        "metonymy": "<i>Numerator:</i> FP & FN and the most popular entity for the given mention text and the prediction are locations, the ground truth is not a location.<br><i>Denominator:</i> NER true positives where the most popular candidate is a location but the ground truth is not.",
-        "partial_name": "<i>Numerator:</i> FP & FN and the mention text is a part of the ground truth entity name.<br><i>Denominator:</i> NER true positives that are a part of the ground truth entity name.",
-        "rare": "<i>Numerator:</i> FP & FN and the most popular entity for the given mention text was predicted instead of the less popular ground truth entity.<br><i>Denominator:</i> NER true positives where the most popular candidate is not the correct entity.",
+        "all": "<p><i>Numerator:</i> A ground truth span was detected, but linked to the wrong entity.</p><p><i>Denominator:</i> All NER true positives.</p>",
+        "demonym": "<p><i>Numerator:</i> FP & FN and the mention text is a demonym, i.e. it is contained in a list of demonyms from Wikidata.</p><p><i>Denominator:</i> NER true positives where the mention text is a demonym.</p>",
+        "metonymy": "<p><i>Numerator:</i> FP & FN and the most popular entity for the given mention text and the prediction are locations, the ground truth is not a location.</p><p><i>Denominator:</i> NER true positives where the most popular candidate is a location but the ground truth is not.</p>",
+        "partial_name": "<p><i>Numerator:</i> FP & FN and the mention text is a part of the ground truth entity name.</p><p><i>Denominator:</i> NER true positives that are a part of the ground truth entity name.</p>",
+        "rare": "<p><i>Numerator:</i> FP & FN and the most popular entity for the given mention text was predicted instead of the less popular ground truth entity.</p><p><i>Denominator:</i> NER true positives where the most popular candidate is not the correct entity.</p>",
         "other": "Disambiguation error that does not fall into any of the other categories.",
-        "wrong_candidates": "<i>Numerator:</i> FP & FN and the ground truth entity is not in the candidate set returned by the linker for the mention.<br><i>Denominator:</i> All NER true positives.",
-        "multi_candidates": "<i>Numerator:</i> FP & FN and the candidate set for the mention contains multiple candidate entities, one of which is the ground truth entity, and the linker chose a wrong entity.<br><i>Denominator:</i> NER true positives where the linker returned a candidate set with more than one entity and the ground truth is contained in the candidate set."
+        "wrong_candidates": "<p><i>Numerator:</i> FP & FN and the ground truth entity is not in the candidate set returned by the linker for the mention.</p><p><i>Denominator:</i> All NER true positives.</p>",
+        "multiple_candidates": "<p><i>Numerator:</i> FP & FN and the candidate set for the mention contains multiple candidate entities, one of which is the ground truth entity, and the linker chose a wrong entity.</p><p><i>Denominator:</i> NER true positives where the linker returned a candidate set with more than one entity and the ground truth is contained in the candidate set.</p>"
     },
     "other_errors": {
         "": "Errors that are not clearly distinguishable as NER false negatives, NER false positives or disambiguation errors.",
-        "hyperlink": "<i>Numerator:</i> Undetected mention that is also a hyperlink.<br><i>Denominator:</i> All ground truth mentions that are hyperlinks."
+        "hyperlink": "<p><i>Numerator:</i> Undetected mention that is also a hyperlink.</p><p><i>Denominator:</i> All ground truth mentions that are hyperlinks.</p>"
     },
     "wrong_coreference": {
         "": "Coreference errors.",
         "false_detection": "NER FP with a mention text in {It, it, This, this, That, that, Its, its}",
-        "reference_wrongly_disambiguated": "<i>Numerator:</i> Coreference FN & FP and the reference was wrongly disambiguated.<br><i>Denominator:</i> Coreference mentions where the correct ground truth mention was referenced.",
-        "wrong_mention_referenced": "<i>Numerator:</i> Coreference FN + FP and the wrong mention was referenced.<br><i>Denominator:</i> Coreference NER true positives.",
-        "undetected": "<i>Numerator:</i> Coreference FN and the mention was not linked.<br><i>Denominator:</i> Ground truth coreference mentions."
+        "reference_wrongly_disambiguated": "<p><i>Numerator:</i> Coreference FN & FP and the reference was wrongly disambiguated.</p><p><i>Denominator:</i> Coreference mentions where the correct ground truth mention was referenced.</p>",
+        "wrong_mention_referenced": "<p><i>Numerator:</i> Coreference FN + FP and the wrong mention was referenced.</p><p><i>Denominator:</i> Coreference NER true positives.</p>",
+        "undetected": "<p><i>Numerator:</i> Coreference FN and the mention was not linked.</p><p><i>Denominator:</i> Ground truth coreference mentions.</p>"
     },
-    "NER": {
+    "ner": {
         "": "Named Entity Recognition results.",
-        "tp": "TP: Predictions with a matching ground truth span.<br>",
-        "fp": "FP: Predictions with no matching ground truth span.<br>",
-        "fn": "FN: Ground truth spans with no matching prediction span."
+        "tp": "<i>TP</i>: Predictions with a matching ground truth span.",
+        "fp": "<i>FP</i>: Predictions with no matching ground truth span.",
+        "fn": "<i>FN</i>: Ground truth spans with no matching prediction span."
     },
     "all": {
         "": "Overall entity linking and coreference results.",
-        "tp": "TP: Predictions where the mention span and entity match a groundtruth mention span and entity.<br>",
-        "fp": "FP: Predictions where the mention either does not match a groundtruth mention span or the predicted entity does not match the groundtruth entity.<br>",
-        "fn": "FN: Groundtruth where the mention either does not match a predicted mention span or the predicted entity does not match the groundtruth entity."
+        "tp": "<i>TP</i>: Predictions where the mention span and entity match a groundtruth mention span and entity.",
+        "fp": "<i>FP</i>: Predictions where the mention either does not match a groundtruth mention span or the predicted entity does not match the groundtruth entity.",
+        "fn": "<i>FN</i>: Groundtruth where the mention either does not match a predicted mention span or the predicted entity does not match the groundtruth entity."
     },
     "entity": {
         "": "Entity linking results.",
-        "tp": "TP: True positive entities (excluding coreferences).<br>",
-        "fp": "FP: False positive entities (excluding coreferences).<br>",
-        "fn": "FN: False negative entities (excluding coreferences)."
+        "tp": "<i>TP</i>: True positive entities (excluding coreferences).",
+        "fp": "<i>FP</i>: False positive entities (excluding coreferences).",
+        "fn": "<i>FN</i>: False negative entities (excluding coreferences)."
     },
     "entity_named": {
         "": "Entity linking results for named entities, i.e. entities where the first alphabetic character is an uppercase letter.",
-        "tp": "TP: True positive named entities.<br>",
-        "fp": "FP: False positive named entities.<br>",
-        "fn": "FN: False negative named entities."
+        "tp": "<i>TP</i>: True positive named entities.",
+        "fp": "<i>FP</i>: False positive named entities.",
+        "fn": "<i>FN</i>: False negative named entities."
     },
     "entity_other": {
         "": "Entity linking results for non-named entities, i.e. entities where the first alphabetic character is a lowercase letter.",
-        "tp": "TP: True positive non-named (i.e. lowercase) entities.<br>",
-        "fp": "FP: False positive non-named (i.e. lowercase) entities.<br>",
-        "fn": "FN: False negative non-named (i.e. lowercase) entities."
+        "tp": "<i>TP</i>: True positive non-named (i.e. lowercase) entities.",
+        "fp": "<i>FP</i>: False positive non-named (i.e. lowercase) entities.",
+        "fn": "<i>FN</i>: False negative non-named (i.e. lowercase) entities."
     },
     "coref": {
         "": "Coreference results.",
-        "tp": "TP: True positive coreferences.<br>",
-        "fp": "FP: False positive coreferences.<br>",
-        "fn": "FN: False negative coreferences."
+        "tp": "<i>TP</i>: True positive coreferences.",
+        "fp": "<i>FP</i>: False positive coreferences.",
+        "fn": "<i>FN</i>: False negative coreferences."
     },
     "coref_pronominal": {
         "": "Results for pronominal coreference, i.e. the mention text is a pronoun.",
-        "tp": "TP: True positive pronominal coreferences (mention text is a pronoun).<br>",
-        "fp": "FP: False positive pronominal coreferences (mention text is a pronoun).<br>",
-        "fn": "FN: False negative pronominal coreferences (mention text is a pronoun)."
+        "tp": "<i>TP</i>: True positive pronominal coreferences (mention text is a pronoun).",
+        "fp": "<i>FP</i>: False positive pronominal coreferences (mention text is a pronoun).",
+        "fn": "<i>FN</i>: False negative pronominal coreferences (mention text is a pronoun)."
     },
     "coref_nominal": {
         "": "Results for nominal coreference, i.e. the mention text is \"the &lttype&gt\".",
-        "tp": "TP: True positive nominal coreferences (mention text is \"the &lttype&gt\").<br>",
-        "fp": "FP: False positive nominal coreferences (mention text is \"the &lttype&gt\").<br>",
-        "fn": "FN: False negative nominal coreferences (mention text is \"the &lttype&gt\").",
+        "tp": "<i>TP</i>: True positive nominal coreferences (mention text is \"the &lttype&gt\").",
+        "fp": "<i>FP</i>: False positive nominal coreferences (mention text is \"the &lttype&gt\").",
+        "fn": "<i>FN</i>: False negative nominal coreferences (mention text is \"the &lttype&gt\")."
     },
-    "precision": "Precision = TP / (TP + FP)<br>",
-    "recall": "Recall = TP / (TP + FN)<br>",
-    "f1": "F1 = 2 * (P * R) / (P + R)<br>",
+    "evaluation_mode": {
+        "ignored": "Unknown ground truth entities, unknown predicted entities and optional ground truth entities are completely ignored. This is equivalent to GERBIL's \"inKB\" mode.",
+        "optional": "Linking unknown and optional ground truth entities is not required, but is ok (i.e. not evaluated) iff the linked entity is correct. For unknown ground truth entities only NIL predictions are correct.",
+        "required": "Linking unknown and optional ground truth entities is compulsory. Unknown ground truth entities have to be linked to NIL. This is equivalent to GERBIL's \"normal\" mode."
+    },
+    "precision": "<i>Precision = TP / (TP + FP)</i>",
+    "recall": "<i>Recall = TP / (TP + FN)</i>",
+    "f1": "<i>F1 = 2 * (P * R) / (P + R)</i>",
 };
 
 error_category_mapping = {
@@ -127,18 +132,18 @@ error_category_mapping = {
     },
     "wrong_disambiguation": {
         "all": ["DISAMBIGUATION_WRONG"],
-        "demonym": ["DISAMBIGUATION_DEMONYM_CORRECT", "DISAMBIGUATION_DEMONYM_WRONG"],
-        "partial_name": ["DISAMBIGUATION_PARTIAL_NAME_CORRECT", "DISAMBIGUATION_PARTIAL_NAME_WRONG"],
-        "metonymy": ["DISAMBIGUATION_METONYMY_CORRECT", "DISAMBIGUATION_METONYMY_WRONG"],
-        "rare": ["DISAMBIGUATION_RARE_CORRECT", "DISAMBIGUATION_RARE_WRONG"],
+        "demonym": ["DISAMBIGUATION_DEMONYM_WRONG"],
+        "partial_name": ["DISAMBIGUATION_PARTIAL_NAME_WRONG"],
+        "metonymy": ["DISAMBIGUATION_METONYMY_WRONG"],
+        "rare": ["DISAMBIGUATION_RARE_WRONG"],
         "other": ["DISAMBIGUATION_WRONG_OTHER"],
         "wrong_candidates": ["DISAMBIGUATION_WRONG_CANDIDATES"],
-        "multi_candidates": ["DISAMBIGUATION_MULTI_CANDIDATES_CORRECT", "DISAMBIGUATION_MULTI_CANDIDATES_WRONG"]
+        "multiple_candidates": ["DISAMBIGUATION_MULTI_CANDIDATES_WRONG"]
     },
     "false_detection": {
         "all": ["FALSE_DETECTION"],
-        "abstract_entity": ["FALSE_DETECTION_ABSTRACT_ENTITY"],
-        "unknown_entity": ["FALSE_DETECTION_UNKNOWN_ENTITY"],
+        "lowercased": ["FALSE_DETECTION_LOWERCASED"],
+        "groundtruth_unknown": ["FALSE_DETECTION_GROUNDTRUTH_UNKNOWN"],
         "other": ["FALSE_DETECTION_OTHER"],
         "wrong_span": ["FALSE_DETECTION_WRONG_SPAN"]
     },
@@ -250,20 +255,24 @@ $("document").ready(function() {
     });
 
     // Reposition annotation tooltips on the right edge of the window on mouseenter
-    $("#prediction_overview").on("mouseenter", ".annotation", function() {
+    // Annotation could be in the prediction overview or the example modal
+    $("table").on("mouseenter", ".annotation", function() {
         reposition_annotation_tooltip(this);
     });
 
     // Position table tooltips
-    $("#evaluation_table_wrapper").on("mouseenter", ".tooltip", function() {
+    $("#evaluation_table_wrapper tbody").on("mouseenter", ".tooltip", function() {
         position_table_tooltip(this);
     });
 
-    // Tooltips need to be repositioned on window resize
+    // Annotation tooltip positions and size need to be reset on window resize
     // otherwise some might overlap with the left window edge.
     $(window).on('resize', function(){
-        $("#prediction_overview").find(".tooltiptext").each(function() {
-            if ($(this).css("right") == "0px") $(this).css({"right": "auto", "left": "0px"});
+        $("table .annotation").find(".tooltiptext").each(function() {
+            if ($(this).css("right") == "0px") {
+                $(this).css({"right": "auto", "left": "0px", "white-space": "nowrap", "width": "auto",
+                             "transform": "none"});
+            }
         });
     });
 
@@ -304,6 +313,23 @@ $("document").ready(function() {
         sortRestart: true
     });
 
+    $('table').on('stickyHeadersInit', function() {
+        // Add table header tooltips to sticky header
+        $("#evaluation_table_wrapper .tablesorter-sticky-wrapper th").each(function() {
+            var keys = get_table_header_keys(this);
+            var tooltiptext = get_header_tooltip_text(keys[0], keys[1]);
+            if (tooltiptext) {
+                tippy(this, {
+                    content: tooltiptext,
+                    allowHTML: true,
+                    interactive: (tooltiptext.includes("</a>")),
+                    appendTo: document.body,
+                    theme: 'light-border',
+                });
+            }
+        });
+    });
+
     // Update URL on table sort
     $("#evaluation_table_wrapper table").bind("sortEnd",function() {
         // Update current URL without refreshing the site
@@ -324,6 +350,8 @@ $("document").ready(function() {
             }
             if (event.ctrlKey && event.which == 39) {
                 // Jump to next error highlight
+                // This is not needed anymore when only the numerator mentions (i.e. the errors) are highlighted anyway
+                // but keep it until we know for sure that we don't want to display denominator mentions.
                 scroll_to_next_annotation(true);
             } else if (event.ctrlKey && event.which == 37) {
                 scroll_to_previous_annotation(true);
@@ -348,8 +376,8 @@ function get_type_label(qid) {
 
 function read_example_benchmark_data() {
     var filename = EXAMPLE_BENCHMARK_RESULTS_PATH.substring(0, EXAMPLE_BENCHMARK_RESULTS_PATH.length - RESULTS_EXTENSION.length);
-    var articles_path = filename + ".jsonl";
-    var cases_path = filename + ".cases";
+    var articles_path = filename + ".linked_articles.jsonl";
+    var cases_path = filename + ".eval_cases.jsonl";
 
     articles_example_benchmark = [];
     $.get(EXAMPLE_BENCHMARK_PATH, function(data) {
@@ -388,12 +416,13 @@ function show_example_benchmark_modal(el) {
     to the error category of the clicked table header tooltip.
     */
     // Get example error category of the table tooltip to highlight only corresponding mentions
-    var selected_category = get_error_category_or_type($(el).closest("th")[0]);
+    // Hack to get the reference object from the clicked tippy tooltip.
+    var table_header_cell = $(el).parent().parent().parent().parent()[0]._tippy.reference;
+    var selected_category = get_error_category_or_type(table_header_cell);
 
     // Get table header title
-    var table_header_cell = $(el).closest("th")[0];
-    var classes = $(table_header_cell).attr('class').split(/\s+/);
-    var error_category_title = classes[1].replace(/_/g, " ").replace("-", " - ");
+    var keys = get_table_header_keys(table_header_cell);
+    var error_category_title = keys[0].replace(/_/g, " ") + " - " + keys[1].replace(/_/g, " ");
 
     // Determine article index of selected example
     var article_index = 0;
@@ -406,9 +435,8 @@ function show_example_benchmark_modal(el) {
     }
 
     // Display error explanation extracted from table header tooltip text
-    var keys = classes[1].split("-");
     var error_explanation = header_descriptions[keys[0]][keys[1]];
-    error_explanation = error_explanation.replace(/.*<i>Numerator:<\/i> (.*)<br>.*/, "$1");
+    error_explanation = error_explanation.replace(/.*<i>Numerator:<\/i> (.*?)<\/p>.*/, "$1");
     $("#error_explanation").text("Description: " + error_explanation);
     // Display annotated text
     var textfield = $("#example_prediction_overview tr td");
@@ -625,6 +653,7 @@ function read_url_parameters() {
     url_param_show_columns = get_url_parameter_array(get_url_parameter("show_columns"), false);
     url_param_sort_order = get_url_parameter_array(get_url_parameter("sort_order"), true);
     url_param_access = get_url_parameter_string(get_url_parameter("access"));
+    url_param_evaluation_mode = get_url_parameter_string(get_url_parameter("evaluation_mode"));
 }
 
 function get_url_parameter_boolean(url_parameter) {
@@ -665,11 +694,7 @@ function position_table_tooltip(anchor_el) {
     $(anchor_el).find(".tooltiptext").each(function() {
         var tooltip_rect = this.getBoundingClientRect();
         var font_size = $(this).css("font-size").replace("px", "");
-        if (tag_name =="th") {
-            var top = anchor_el_rect.bottom;
-        } else {
-            var top = anchor_el_rect.top - tooltip_rect.height - (font_size / 2);
-        }
+        var top = anchor_el_rect.top - tooltip_rect.height - (font_size / 2);
         $(this).css({"left": anchor_el_rect.left + "px", "top": top + "px"});
     });
 }
@@ -680,16 +705,40 @@ function reposition_annotation_tooltip(annotation_el) {
     */
     var annotation_rect = annotation_el.getBoundingClientRect();
     // Check whether the annotation contains a line break by checking whether its height is bigger than the line height
-    var line_height = parseInt($(annotation_el).css('line-height').replace('px',''));
+    var line_height = parseInt($(annotation_el).css('line-height'));
     var line_break = (annotation_rect.height > line_height + 5);
     $(annotation_el).find(".tooltiptext").each(function() {
         var tooltip_rect = this.getBoundingClientRect();
-        // Correct the tooltip position if it overlaps with the right edge of the window (approximated by table width)
-        // If the annotation contains a line break, check the right
-        if ((annotation_rect.left + tooltip_rect.width) > $("#prediction_overview").width() || line_break)  {
+
+        // Table could be either prediction_overview or the table in the example modal
+        var table_rect = $(this).closest("table")[0].getBoundingClientRect();
+
+        // If the tooltip width is larger than the table width, enable line-wrapping
+        // in the tooltip
+        if (tooltip_rect.width > table_rect.width) {
+            // Set the new width to the width of the table, minus tooltip padding and
+            // border since those are added on top of css width.
+            var paddings = parseInt($(this).css('paddingLeft')) + parseInt($(this).css('paddingRight'));
+            var borders = parseInt($(this).css('borderLeftWidth')) + parseInt($(this).css('borderRightWidth'));
+            var new_width = table_rect.width - (paddings + borders);
+            $(this).css({"white-space": "normal", "width": new_width + "px"});
+            // Recompute the tooltip rectangle
+            tooltip_rect = this.getBoundingClientRect();
+        }
+
+        // Correct the tooltip position if it overlaps with the right edge of the table
+        // If the annotation contains a line break, position to the right
+        if ((annotation_rect.left + tooltip_rect.width > table_rect.right) || line_break)  {
             // Align right tooltip edge with right edge of the annotation.
             // Left needs to be set to auto since it is otherwise still 0.
             $(this).css({"right": "0px", "left": "auto"});
+
+            // If now the left tooltip edge overlaps with the left edge of the table
+            // translate the table as far right as possible
+            if (annotation_rect.right - tooltip_rect.width < table_rect.left) {
+                var translation = table_rect.right - annotation_rect.right;
+                this.style.transform = "translateX(" + translation + "px)";
+            }
         }
     });
 }
@@ -842,7 +891,7 @@ function show_benchmark_results(initial_call) {
     selected_cells = [];
     reset_selected_cell_categories();
 
-    // Build an overview table over all .results-files from the evaluation-results folder.
+    // Build an overview table over all eval_results.json-files from the evaluation-results folder.
     build_overview_table(benchmark_name, default_selected_systems, default_selected_emphasis, initial_call);
 
     // Read the article and ground truth information from the benchmark.
@@ -1027,16 +1076,20 @@ function get_annotations(article_index, approach_name, column_idx, example_bench
     /*
     Generate annotations for the predicted entities of the selected approach and article.
 
-    This method first combines the predictions outside the evaluation span (from the file <approach>.jsonl)
-    with the evaluated predictions inside the evaluation span (from the file <approach>.cases),
+    This method first combines the predictions outside the evaluation span (from the file <approach>.linked_articles.jsonl)
+    with the evaluated predictions inside the evaluation span (from the file <approach>.eval_cases.jsonl),
     and then generates annotations for all of them.
     */
+    var eval_mode;
     if (example_benchmark) {
-        var article_cases = evaluation_cases_example_benchmark[article_index];  // information from the .cases file
-        var article_data = articles_data_example_benchmark[article_index];  // information from the .jsonl file
+        eval_mode = "IGNORED";
+        var article_cases = evaluation_cases_example_benchmark[article_index][eval_mode];  // info from the eval_cases file
+        var article_data = articles_data_example_benchmark[article_index];  // info from the linked_articles file
     } else {
-        var article_cases = evaluation_cases[approach_name][article_index];  // information from the .cases file
-        var article_data = articles_data[approach_name][article_index];  // information from the .jsonl file
+        // Get currently selected evaluation mode
+        eval_mode = get_evaluation_mode();
+        var article_cases = evaluation_cases[approach_name][article_index][eval_mode];  // info from the eval_cases file
+        var article_data = articles_data[approach_name][article_index];  // info from the linked_articles file
     }
 
     var child_label_to_parent = {};
@@ -1113,38 +1166,37 @@ function get_annotations(article_index, approach_name, column_idx, example_bench
 
         var gt_annotation = {};
         var pred_annotation = {};
-
-        // mention is an evaluated case
         if ("predicted_entity" in mention || "true_entity" in mention) {
-            if ("true_entity" in mention && mention.true_entity.entity_id.startsWith("Unknown")) {
-                // GT entity is NIL
-                gt_annotation.class = ANNOTATION_CLASS_UNKNOWN;
-                if ("predicted_entity" in mention) {
-                    pred_annotation.class = (mention.predicted_entity.entity_id == null) ? ANNOTATION_CLASS_UNKNOWN : ANNOTATION_CLASS_FP;
+            // mention is an evaluated case. Get the annotation class.
+            var linking_eval_types = mention.linking_eval_types[eval_mode];
+            if (linking_eval_types.includes("TP")) {
+                gt_annotation.class = ANNOTATION_CLASS_TP;
+                pred_annotation.class = ANNOTATION_CLASS_TP;
+            } else if (linking_eval_types.includes("FP")) {
+                pred_annotation.class = ANNOTATION_CLASS_FP;
+                if (linking_eval_types.includes("FN")) {
+                    gt_annotation.class = ANNOTATION_CLASS_FN;
+                } else if (mention.optional) {
+                    gt_annotation.class = ANNOTATION_CLASS_OPTIONAL;
+                } else if ("true_entity" in mention && mention.true_entity.entity_id.startsWith("Unknown")) {
+                    gt_annotation.class = ANNOTATION_CLASS_UNKNOWN;
                 }
-            } else if (is_correct_optional_case(mention)) {
-                gt_annotation.class = ANNOTATION_CLASS_OPTIONAL;
-                if ("predicted_entity" in mention) {
-                    // Prediction is a correct optional, i.e. unevaluated.
-                    pred_annotation.class = ANNOTATION_CLASS_UNEVALUATED;
-                }
-            } else if ("predicted_entity" in mention) {
-                 if ("true_entity" in mention && !mention.true_entity.entity_id.startsWith("Unknown")) {
-                     if (mention.true_entity.entity_id == mention.predicted_entity.entity_id) {
-                        // predicted the true entity
-                        gt_annotation.class = ANNOTATION_CLASS_TP;
-                        pred_annotation.class = ANNOTATION_CLASS_TP;
-                    } else {
-                        // predicted the wrong entity
-                        pred_annotation.class = (mention.predicted_entity.entity_id == null) ? ANNOTATION_CLASS_UNKNOWN : ANNOTATION_CLASS_FP;
-                        gt_annotation.class = (is_optional_case(mention)) ? ANNOTATION_CLASS_OPTIONAL : ANNOTATION_CLASS_FN;
-                    }
-                } else {
-                    // wrong span
-                    pred_annotation.class = (mention.predicted_entity.entity_id == null) ? ANNOTATION_CLASS_UNKNOWN : ANNOTATION_CLASS_FP;
+            } else if (linking_eval_types.includes("FN")) {
+                gt_annotation.class = ANNOTATION_CLASS_FN;
+                if ("predicted_entity" in mention && mention.predicted_entity.entity_id == null) {
+                    pred_annotation.class = ANNOTATION_CLASS_UNKNOWN;
                 }
             } else {
-                gt_annotation.class = ANNOTATION_CLASS_FN;
+                if (mention.optional) {
+                    gt_annotation.class = ANNOTATION_CLASS_OPTIONAL;
+                } else if ("true_entity" in mention && mention.true_entity.entity_id.startsWith("Unknown")) {
+                    gt_annotation.class = ANNOTATION_CLASS_UNKNOWN;
+                }
+                if ("predicted_entity" in mention && mention.predicted_entity.entity_id == null) {
+                    pred_annotation.class = ANNOTATION_CLASS_UNKNOWN;
+                } else if ("predicted_entity" in mention) {
+                    pred_annotation.class = ANNOTATION_CLASS_UNEVALUATED;
+                }
             }
 
             if ("true_entity" in mention) {
@@ -1426,6 +1478,7 @@ function generate_annotation_html(snippet, annotation, selected_cell_category, p
 
     var annotation_kind = (annotation.gt_entity_id) ? "gt" : "pred";
     var beginning = (annotation.beginning) ? " beginning" : "";
+    // Annotation id is a class because several spans can belong to the same annotation.
     var annotation_id_class = " annotation_id_" + annotation.id;
     var replacement = "<span class=\"annotation " + annotation_kind + " " + annotation.class + lowlight + beginning + annotation_id_class + "\">";
     replacement += inner_annotation;
@@ -1629,7 +1682,7 @@ function get_emphasis_string(selected_cell_category) {
 
 function build_overview_table(benchmark_name, default_selected_systems, default_selected_emphasis, initial_call) {
     /*
-    Build the overview table from the .results files found in the subdirectories of the given path.
+    Build the overview table from the .eval_results.json files found in the subdirectories of the given path.
     */
     var path = EVALUATION_RESULT_PATH;
     var folders = [];
@@ -1644,14 +1697,14 @@ function build_overview_table(benchmark_name, default_selected_systems, default_
             folders.push(name);
         });
     }).done(function() {
-        // Retrieve file path of .results files for the selected benchmark in each folder
+        // Retrieve file path of .eval_results.json files for the selected benchmark in each folder
         $.when.apply($, folders.map(function(folder) {
             return $.get(path + "/" + folder, function(folder_data) {
                 $(folder_data).find("a").each(function() {
                     var file_name = $(this).attr("href");
                     // This assumes the benchmark is specified in the last dot separated column before the
                     // file extension.
-                    var benchmark = file_name.split(".").slice(-2)[0];
+                    var benchmark = file_name.substring(0, file_name.length - RESULTS_EXTENSION.length).split(".").slice(-1);
                     if (file_name.endsWith(RESULTS_EXTENSION) && benchmark == benchmark_name) {
                         var url = path + "/" + folder + "/" + file_name;
                         urls.push(url);
@@ -1659,9 +1712,17 @@ function build_overview_table(benchmark_name, default_selected_systems, default_
                 });
             });
         })).then(function() {
-            // Retrieve contents of each .results file for the selected benchmark and store it in an array
+            // Retrieve contents of each .eval_results.json file for the selected benchmark and store it in an array
             $.when.apply($, urls.map(function(url) {
                 return $.getJSON(url, function(results) {
+                    // Add the radio buttons for the different evaluation modes if they haven't been added yet
+                    if ($('#evaluation_overview #evaluation_modes').find("input").length == 0) {
+                        add_radio_buttons(results);
+                    }
+                    // Get the selected evaluation mode and filter the results accordingly
+                    var eval_mode = get_evaluation_mode();
+                    results = results[eval_mode];
+
                     var approach_name = url.substring(url.lastIndexOf("/") + 1, url.length - RESULTS_EXTENSION.length);
                     // Remove the benchmark extension from the approach name
                     if (approach_name.endsWith("." + benchmark_name)) approach_name = approach_name.substring(0, approach_name.lastIndexOf("."))
@@ -1696,8 +1757,7 @@ function build_overview_table(benchmark_name, default_selected_systems, default_
                     var results = result_tuple[1];
                     if (!$('#evaluation_table_wrapper table thead').html()) {
                         // Add table header if it has not yet been added
-                        var table_header = get_table_header(results, "evaluation");
-                        $('#evaluation_table_wrapper table thead').html(table_header);
+                        add_table_header(results, "evaluation");
                     }
 
                     if (!$('#evaluation_overview .checkboxes').html()) {
@@ -1745,6 +1805,53 @@ function build_overview_table(benchmark_name, default_selected_systems, default_
     });
 }
 
+function add_radio_buttons(json_obj) {
+    /*
+    Add radio buttons for the evaluation modes as extracted from the jsonl results file
+    */
+    $.each(json_obj, function(key) {
+        var class_name = get_class_name(key);
+        var label = to_title_case(key.toLowerCase());
+        var checked = ((class_name == "ignored" && url_param_evaluation_mode == null) || url_param_evaluation_mode == class_name) ? "checked" : "";
+        var radio_button_html = "<span class=\"radio_button_" + class_name + "\"><input type=\"radio\" name=\"eval_mode\" value=\"" + key + "\" onchange=\"on_radio_button_change(this)\" " + checked + ">";
+        radio_button_html += "<label>" + label + "</label></span>\n";
+        $("#evaluation_modes").append(radio_button_html);
+
+        // Add radio button tooltip
+        tippy('#evaluation_modes .radio_button_' + class_name, {
+            content: header_descriptions["evaluation_mode"][class_name],
+            allowHTML: true,
+            theme: 'light-border',
+        });
+    });
+}
+
+function on_radio_button_change(el) {
+    $("#table_loading").addClass("show");
+    $("#evaluation_table_wrapper table").trigger("update");
+
+    // Update current URL without refreshing the site
+    const url = new URL(window.location);
+    url.searchParams.set('evaluation_mode', get_class_name($(el).val()));
+    window.history.replaceState({}, '', url);
+
+    // Remove previous evaluation table content
+    $("#evaluation_table_wrapper table thead").empty();
+    $("#evaluation_table_wrapper table tbody").empty();
+
+    // Remove previous article evaluation content
+    $("#prediction_overview").hide();
+    selected_systems = copy(selected_approach_names);
+    selected_emphasis = selected_cells.map(function(el) {return ($(el).attr('class')) ? $(el).attr('class').split(/\s+/)[1] : null});
+
+    // Build an overview table over all .eval_results.json-files from the evaluation-results folder.
+    build_overview_table(benchmark_name, selected_systems, selected_emphasis, false);
+}
+
+function get_evaluation_mode() {
+    return $('input[name=eval_mode]:checked', '#evaluation_modes').val();
+}
+
 function build_evaluation_table_body(result_list) {
     /*
     Build the table body.
@@ -1754,10 +1861,7 @@ function build_evaluation_table_body(result_list) {
     result_list.forEach(function(result_tuple) {
         var approach_name = result_tuple[0];
         var results = result_tuple[1];
-        if (results) {
-            var row = get_table_row(approach_name, results);
-            $('#evaluation_table_wrapper table tbody').append(row);
-        }
+        if (results) add_table_row(approach_name, results);
     });
 
     // Show / Hide columns according to checkbox state
@@ -1778,16 +1882,20 @@ function add_checkboxes(json_obj, initial_call) {
             var class_name = get_class_name(subkey);
             var title = get_checkbox_label(key, subkey);
             var checked = ((class_name == "all" && url_param_show_columns.length == 0) || url_param_show_columns.includes(class_name)) ? "checked" : "";
-            var checkbox_html = "<span><input type=\"checkbox\" class=\"checkbox_" + class_name + "\" onchange=\"on_column_checkbox_change(this, true)\" " + checked + ">";
-            checkbox_html += "<label>" + title;
-            var tooltip_text = get_header_tooltip_text(subkey, "");
-            if (tooltip_text) checkbox_html += "<span class='tooltiptext'>" + tooltip_text + "</span>";
-            checkbox_html += "</label></span>\n";
+            var checkbox_html = "<span id=\"checkbox_span_" + class_name + "\"><input type=\"checkbox\" class=\"checkbox_" + class_name + "\" onchange=\"on_column_checkbox_change(this, true)\" " + checked + ">";
+            checkbox_html += "<label>" + title + "</label></span>\n";
             var checkbox_div_id = "";
             if (key == "mention_types") checkbox_div_id = "mention_type_checkboxes";
             if (key == "error_categories") checkbox_div_id = "error_category_checkboxes";
             if (key == "entity_types") checkbox_div_id = "entity_type_checkboxes";
             $("#" + checkbox_div_id + ".checkboxes").append(checkbox_html);
+
+            // Add tooltip for checkbox
+            tippy("#checkbox_span_" + class_name, {
+                content: get_header_tooltip_text(subkey, ""),
+                allowHTML: true,
+                theme: 'light-border',
+            });
         });
     });
 }
@@ -1797,7 +1905,7 @@ function on_column_checkbox_change(element, resize) {
 
     // Update current URL without refreshing the site
     var checkbox_classes = [];
-    var checkboxes = $("#evaluation_overview .checkboxes input:checked").each(function() {
+    var checkboxes = $("#evaluation_overview .checkboxes input[type=checkbox]:checked").each(function() {
         checkbox_classes.push($(this).attr("class").split(/\s+/)[0].replace("checkbox_", ""));
     });
     const url = new URL(window.location);
@@ -1826,7 +1934,7 @@ function show_hide_columns(element, resize) {
     }
 }
 
-function get_table_header(json_obj) {
+function add_table_header(json_obj) {
     /*
     Get html for the table header.
     */
@@ -1840,77 +1948,104 @@ function get_table_header(json_obj) {
                 if (!(ignore_headers.includes(subsubkey))) {
                     var subclass_name = get_class_name(subsubkey);
                     var sort_order = (subkey in error_category_mapping) ? " data-sortinitialorder=\"asc\"" : "";
-                    second_row += "<th class='" + class_name + " " + class_name + "-" + subclass_name + " tooltip sorter-digit'" + sort_order + ">" + get_table_heading(subkey, subsubkey);
-                    var tooltip_text = get_header_tooltip_text(subkey, subsubkey);
-                    if (tooltip_text) second_row += "<span class='tooltiptext'>" + tooltip_text + "</span>";
-                    second_row += "</th>";
+                    second_row += "<th class='" + class_name + " " + class_name + "-" + subclass_name + " sorter-digit'" + sort_order + ">" + get_table_heading(subkey, subsubkey) + "</th>";
                     colspan += 1;
                 }
             });
-            first_row += "<th colspan=\"" + colspan + "\" class='" + class_name + " tooltip'>" + get_table_heading(key, subkey);
-            var tooltip_text = get_header_tooltip_text(subkey, "");
-            if (tooltip_text) first_row += "<span class='tooltiptext'>" + tooltip_text + "</span>";
-            first_row += "</th>";
+            first_row += "<th colspan=\"" + colspan + "\" class='" + class_name + "'>" + get_table_heading(key, subkey) + "</th>";
         });
     });
     first_row += "</tr>";
     second_row += "</tr>";
-    return first_row + second_row;
+    $('#evaluation_table_wrapper table thead').html(first_row + second_row);
+
+    // Add table header tooltips
+    $("#evaluation_table_wrapper th").each(function() {
+        var keys = get_table_header_keys(this);
+        var tooltiptext = get_header_tooltip_text(keys[0], keys[1]);
+        if (tooltiptext) {
+            tippy(this, {
+                content: tooltiptext,
+                allowHTML: true,
+                interactive: (tooltiptext.includes("</a>")),
+                appendTo: document.body,
+                theme: 'light-border',
+            });
+        }
+    });
 }
 
-function get_table_row(approach_name, json_obj) {
+function get_table_header_keys(th_element) {
+    /*
+    Get keys for table headers.
+    For the first table header row this is a single key, e.g. "entity_named".
+    For the second table header row this is two keys, e.g. "entity_named" and "precision".
+    */
+    var keys = ["", ""];
+    var all_classes_string = $(th_element).attr('class');
+    // Experiment column has no attribute 'class'
+    if (all_classes_string) {
+        var all_classes = all_classes_string.split(/\s+/);
+        if (all_classes.length > 1) {
+            // Second table header row
+            var classes = all_classes[1].split("-");
+            keys[0] = classes[0];
+            keys[1] = classes[1]
+        } else if (all_classes.length == 1) {
+            // First table header row
+            keys[0] = all_classes[0];
+        }
+    }
+    return keys;
+}
+
+function add_table_row(approach_name, json_obj) {
     /*
     Get html for the table row with the given approach name and result values.
     */
     var row = "<tr onclick='on_row_click(this)'>";
     var onclick_str = " onclick='on_cell_click(this)'";
     row += "<td " + onclick_str + ">" + approach_name + "</td>";
-    $.each(json_obj, function(key) {
-        $.each(json_obj[key], function(subkey) {
-            row += get_table_row_by_json_key(json_obj[key], subkey, onclick_str);
+    $.each(json_obj, function(basekey) {
+        $.each(json_obj[basekey], function(key) {
+            var new_json_obj = json_obj[basekey][key];
+            var class_name = get_class_name(key);
+            $.each(new_json_obj, function(subkey) {
+                // Include only keys in the table, that are not on the ignore list
+                if (!(ignore_headers.includes(subkey))) {
+                    var value = new_json_obj[subkey];
+                    if (value == null) {
+                        // This means, the category does not apply to the given approach
+                        value = "-";
+                    } else if (Object.keys(value).length > 0) {
+                        // Values that consist not of a single number but of multiple
+                        // key-value pairs are displayed in a single column.
+                        var processed_value = "<div class='" + class_name + " tooltip'>";
+                        var percentage = get_error_percentage(value);
+                        processed_value += percentage + "%";
+                        processed_value += "<span class='tooltiptext'>";
+                        processed_value += value["errors"] + " / " + value["total"];
+                        processed_value += "</span></div>";
+                        value = processed_value;
+                    } else if (percentage_headers.includes(subkey)) {
+                        // Get rounded percentage but only if number is a decimal < 1
+                        processed_value = "<div class='" + class_name + " tooltip'>";
+                        processed_value += (value * 100).toFixed(2) + "%";
+                        // Create tooltip text
+                        processed_value += "<span class='tooltiptext'>" + get_tooltip_text(new_json_obj) + "</span></div>";
+                        value = processed_value;
+                    } else {
+                        Math.round(new_json_obj[subkey] * 100) / 100;
+                    }
+                    var subclass_name = get_class_name(subkey);
+                    var data_string = "data-category='" + class_name + "," + subclass_name + "'";
+                    row += "<td class='" + class_name + " " + class_name + "-" + subclass_name + "' " + data_string + onclick_str + ">" + value + "</td>";
+                }
+            });
         });
     });
     row += "</tr>";
-    return row;
-}
-
-function get_table_row_by_json_key(json_obj, key, onclick_str) {
-    var row_addition = "";
-    var class_name = get_class_name(key);
-    var tooltip_text = "";
-    $.each(json_obj[key], function(subkey) {
-        // Include only keys in the table, that are not on the ignore list
-        if (!(ignore_headers.includes(subkey))) {
-            var value = json_obj[key][subkey];
-            if (value == null) {
-                // This means, the category does not apply to the given approach
-                value = "-";
-            } else if (Object.keys(value).length > 0) {
-                // Values that consist not of a single number but of multiple
-                // key-value pairs are displayed in a single column.
-                var processed_value = "<div class='" + class_name + " tooltip'>";
-                var percentage = get_error_percentage(value);
-                processed_value += percentage + "%";
-                processed_value += "<span class='tooltiptext'>";
-                processed_value += value["errors"] + " / " + value["total"];
-                processed_value += "</span></div>";
-                value = processed_value;
-            } else if (percentage_headers.includes(subkey)) {
-                // Get rounded percentage but only if number is a decimal < 1
-                processed_value = "<div class='" + class_name + " tooltip'>";
-                processed_value += (value * 100).toFixed(2) + "%";
-                // Create tooltip text
-                processed_value += "<span class='tooltiptext'>" + get_tooltip_text(json_obj[key]) + "</span></div>";
-                value = processed_value;
-            } else {
-                Math.round(json_obj[key][subkey] * 100) / 100;
-            }
-            var subclass_name = get_class_name(subkey);
-            var data_string = "data-category='" + class_name + "," + subclass_name + "'";
-            row_addition += "<td class='" + class_name + " " + class_name + "-" + subclass_name + "' " + data_string + onclick_str + ">" + value + "</td>";
-        }
-    });
-    return row_addition;
+    $('#evaluation_table_wrapper table tbody').append(row);
 }
 
 function get_error_percentage(value) {
@@ -1929,7 +2064,9 @@ function get_tooltip_text(json_obj) {
 }
 
 function get_header_tooltip_text(key, subkey) {
-    if (key in header_descriptions) {
+    if (key.toLowerCase() in header_descriptions) {
+        key = key.toLowerCase();
+        subkey = subkey.toLowerCase();
         if (typeof header_descriptions[key] == "string") {
             return header_descriptions[key];
         }
@@ -1940,13 +2077,13 @@ function get_header_tooltip_text(key, subkey) {
             }
             return tooltip_text;
         } else {
-            var tp_string = header_descriptions[key]["tp"];
-            var fp_string = header_descriptions[key]["fp"];
-            var fn_string = header_descriptions[key]["fn"];
-            var string = header_descriptions[subkey];
+            var tp_string = "<p>" + header_descriptions[key]["tp"] + "</p>";
+            var fp_string = "<p>" + header_descriptions[key]["fp"] + "</p>";
+            var fn_string = "<p>" + header_descriptions[key]["fn"] + "</p>";
+            var string = "<p>" + header_descriptions[subkey] + "</p>";
             if (subkey == "precision") {
                 string += tp_string;
-                string += fn_string;
+                string += fp_string;
             } else if (subkey == "recall") {
                 string += tp_string;
                 string += fn_string;
@@ -1957,14 +2094,15 @@ function get_header_tooltip_text(key, subkey) {
             }
             return string;
         }
-    } else if (key in whitelist_types || key.toLowerCase() == "other") {
-        var type = (key in whitelist_types) ? whitelist_types[key] : "other";
+    } else if (key.toUpperCase() in whitelist_types || key.toLowerCase() == "other") {
+        key = key.toUpperCase();
+        var type = (key in whitelist_types) ? whitelist_types[key] : "Other";
         if (subkey) {
             // Get tooltips for precision, recall and f1
-            var tp_string = "TP: True Positives of type " + type + "<br>";
-            var fp_string = "FP: False Positives of type " + type + "<br>";
-            var fn_string = "FN: False Negatives of type " + type + "<br>";
-            var string = header_descriptions[subkey];
+            var tp_string = "<p><i>TP</i>: True Positives of type " + type + "</p>";
+            var fp_string = "<p><i>FP</i>: False Positives of type " + type + "</p>";
+            var fn_string = "<p><i>FN</i>: False Negatives of type " + type + "</p>";
+            var string = "<p>" + header_descriptions[subkey] + "</p>";
             if (subkey == "precision") {
                 string += tp_string;
                 string += fp_string;
@@ -1985,24 +2123,30 @@ function get_header_tooltip_text(key, subkey) {
 }
 
 function get_class_name(text) {
-    return text.toLowerCase().replace(/[ ,.#:]/g, "_");
+    var name = text.toLowerCase().replace(/[ ,.#:]/g, "_");
+    if (name != text.toLowerCase()) console.log("WARNING! Class name is not identical to key: " + name + " vs. " + text);
+    return name;
 }
 
 function get_checkbox_label(key, subkey) {
+    var lower_key = key.toLowerCase();
+    var lower_subkey = subkey.toLowerCase();
     if (key == "entity_types" && subkey in whitelist_types) {
         return whitelist_types[subkey];
-    } else if (key in result_titles && subkey in result_titles[key]) {
-        return result_titles[key][subkey]["checkbox_label"];
+    } else if (lower_key in result_titles && lower_subkey in result_titles[lower_key]) {
+        return result_titles[lower_key][lower_subkey]["checkbox_label"];
     } else {
         return to_title_case(subkey.replace(/_/g, " "));
     }
 }
 
 function get_table_heading(key, subkey) {
+    var lower_key = key.toLowerCase();
+    var lower_subkey = subkey.toLowerCase();
     if (key == "entity_types" && subkey in whitelist_types) {
         return "Type: " + whitelist_types[subkey];
-    } else if (key in result_titles && subkey in result_titles[key]) {
-        return result_titles[key][subkey]["table_heading"];
+    } else if (lower_key in result_titles && lower_subkey in result_titles[lower_key]) {
+        return result_titles[lower_key][lower_subkey]["table_heading"];
     } else {
         return to_title_case(subkey.replace(/_/g, " "));
     }
@@ -2063,7 +2207,7 @@ function read_articles_data(path, approach_name) {
     They are needed later to visualise the predictions outside the evaluation span of an article.
     
     Arguments:
-    - path: the .jsonl file of the selected approach
+    - path: the .linked_articles.jsonl file of the selected approach
     */
     // Clear articles data cache
     if (Object.keys(articles_data).length >= MAX_CACHED_FILES) {
@@ -2101,11 +2245,11 @@ function read_evaluation(approach_name, selected_approaches, timestamp) {
     Read the predictions and evaluation cases for the selected approach for all articles.
     */
     console.log("read_evaluation() called for ", approach_name, "and ", selected_approaches);
-    var cases_path = result_files[approach_name] + ".cases";
-    var articles_path = result_files[approach_name] + ".jsonl";
+    var cases_path = result_files[approach_name] + ".eval_cases.jsonl";
+    var articles_path = result_files[approach_name] + ".linked_articles.jsonl";
 
     reading_promise = read_articles_data(articles_path, approach_name);
-    reading_promise.then(function() {  // wait until the predictions from the .jsonl file are read, because run_evaluation updates the prediction textfield
+    reading_promise.then(function() {  // wait until the predictions from the file are read, because run_evaluation updates the prediction textfield
         read_evaluation_cases(cases_path, approach_name, selected_approaches, timestamp);
     });
 }
@@ -2346,15 +2490,15 @@ function produce_latex() {
     var row_count = 0;
     var header_string = "";
     $('#evaluation_table_wrapper table thead tr').each(function(){
+        // Tablesorter sticky table duplicates the thead. Don't include the duplicate.
+        if ($(this).closest(".tablesorter-sticky-wrapper").length > 0) return;
+
         $(this).find('th').each(function() {
+            // Do not add hidden table columns
             if (!$(this).is(":hidden")) {
-                // Do not add hidden table columns
                 if (row_count > 0) num_cols += 1;
-                var title = $(this).html();
-                title = title.replace(/_/g, " ");  // Underscore not within $ yields error
-                // Filter out sorting order and tooltip html
-                var match = title.match(/(<div [^<>]*>)?([^<>]*)<(span|div)/);
-                if (match) title = match[2];
+                // Underscore not within $ yields error
+                var title = $(this).text().replace(/_/g, " ");
                 // Get column span of the current header
                 var colspan = parseInt($(this).attr("colspan"), 10);
                 if (colspan) {

@@ -23,7 +23,8 @@ class PriorLinker(AbstractEntityLinker):
         # Get config variables
         self.linker_identifier = config["name"] if "name" in config else "Prior"
         self.ner_identifier = self.linker_identifier
-        whitelist_type_file = config["whitelist_type_file"] if "whitelist_type_file" in config else "data/whitelist.txt"
+        whitelist_type_file = config["whitelist_type_file"] if "whitelist_type_file" in config \
+            else settings.WHITELIST_FILE
         self.use_pos = config["use_pos"] if "use_pos" in config else True
 
         self.whitelist_types = {}
@@ -121,7 +122,7 @@ class PriorLinker(AbstractEntityLinker):
 
     def has_whitelist_type(self, entity_id: str) -> bool:
         if self.entity_db.contains_entity(entity_id):
-            types = self.entity_db.get_entity(entity_id).type.split("|")
+            types = self.entity_db.get_entity(entity_id).get_types()
             for typ in types:
                 if typ in self.whitelist_types:
                     return True

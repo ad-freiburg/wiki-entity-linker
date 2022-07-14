@@ -146,18 +146,15 @@ a {
 }
 
 .checkboxes label {
-    position: relative;
     padding-right: 1em;
     padding-left: 2px;
 }
 
-#evaluation_overview label .tooltiptext {
-    /* Make the tooltip non-reachable so it doesn't get in the way */
-    bottom: 120%;
-}
+/* ----------------------------------------- */
+/* Begin radio buttons for selecting the evaluation mode */
 
-#evaluation_overview label:hover .tooltiptext {
-    visibility: visible;
+#evaluation_modes span {
+    white-space: nowrap;
 }
 
 /* ----------------------------------------- */
@@ -255,23 +252,14 @@ a {
     position: fixed;
     right: auto;
     bottom: auto;
+    width: 5em;
+    min-width: 5em;
+    font-size: 1em;
 }
 
 /* Show the tooltip text when you mouse over the tooltip container */
 #evaluation_table_wrapper .tooltip:hover .tooltiptext {
     visibility: visible;
-}
-
-/* Show the tooltip text when you mouse over a table header cell that comes with a description */
-#evaluation_table_wrapper th .tooltiptext {
-    font-weight: 300;
-}
-
-/* Cell tooltip for precision / recall / F1 cells */
-#evaluation_table_wrapper td .tooltiptext {
-    width: 5em;
-    min-width: 5em;
-    font-size: 1em;
 }
 
 /* ----------------------------------------- */
@@ -321,6 +309,8 @@ div.latex textarea {
 
 #over-table-row {
     display: flex;
+    /* Allow wrapping if necessary so the annotation explanation button does not overlap with the right window edge */
+    flex-wrap: wrap;
     justify-content: space-between; /* Put left child at the left end and right child at the right end */
 }
 

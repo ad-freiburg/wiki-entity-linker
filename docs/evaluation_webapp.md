@@ -12,7 +12,7 @@ Steps 1 - 4 are executed automatically when running `make start_webapp`.
        cd evaluation-webapp
 
 2. Link to the results directory `evaluation-results`. This is the directory containing subfolders with
-`<approach>.cases` files.
+`*.linked_articles.jsonl`, `*.eval_cases.jsonl` and `*.eval_results.json` files.
 
        ln -s ../evaluation-results
 
@@ -22,7 +22,7 @@ Steps 1 - 4 are executed automatically when running `make start_webapp`.
 
 4. Link to the whitelist type file that contains a mapping from whitelist type QIDs to their label
 
-       ln -s ../data/whitelist_types.tsv
+       ln -s ../small-data-files/whitelist_types.tsv
 
 5. Start a file server
 
