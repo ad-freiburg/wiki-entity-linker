@@ -10,8 +10,6 @@ from src.utils.knowledge_base_mapper import KnowledgeBaseMapper
 
 logger = logging.getLogger("main." + __name__.split(".")[-1])
 
-tagme.GCUBE_TOKEN = "56af583d-5f6e-496f-aea2-eab06673b6a3-843339462"
-
 
 class TagMeLinker(AbstractEntityLinker):
     def __init__(self, entity_db: EntityDatabase, config: Dict[str, Any]):
@@ -19,9 +17,16 @@ class TagMeLinker(AbstractEntityLinker):
         self.model = None
 
         # Get config variables
-        self.linker_identifier = config["name"] if "name" in config else "TagMe"
+        self.linker_identifier = config["linker_name"] if "linker_name" in config else "TagMe"
         self.ner_identifier = self.linker_identifier
         self.rho_threshold = config["rho_threshold"] if "rho_threshold" in config else 0.2
+        if "token" not in config or config["token"] in ("", "replace with your own access token"):
+            logger.error("You need an access token in order to run the TagMe Linker.\nSee "
+                         "https://github.com/marcocor/tagme-python for instructions on how to get the token. "
+                         "(It's easy!)\nThen set your personal access token in configs/tagme.config.json .")
+            raise RuntimeError('No valid TagMe access token provided.')
+        else:
+            tagme.GCUBE_TOKEN = config["token"]
 
     def predict(self,
                 text: str,

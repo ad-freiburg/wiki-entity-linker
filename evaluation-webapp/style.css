@@ -1,11 +1,17 @@
 :root {
-    --row-hover-color: #E0E0E0;
-    --row-selected-color: #D1D1D1;
-    --cell-header-color: #999999;
-    --cell-first-column-color: #BBBBBB;
-    --cell-color: #EEEEEE;
-    --cell-hover-color: #F9E29B;
-    --cell-selected-color: #F6CF59;
+    --uni-blue: #004A99;
+    --uni-blue-tint-3: #ccdaea;
+    --uni-blue-tint-2: #dbe5f0;
+    --uni-blue-tint-1: #e5ecf4;
+    --uni-blue-tint-0: #eff3f8;
+    --row-hover-color: var(--uni-blue-tint-2);
+    --row-selected-color: var(--uni-blue-tint-3);
+    --cell-header-color: #7e93aa;
+    --cell-first-column-color: #a3b5c9;
+    --cell-color: var(--uni-blue-tint-0);
+    --cell-hover-color: #becbd9;
+    --cell-selected-color: #a3b5c9;
+    --sibling-selected-color: var(--uni-blue-tint-1);
     --annotation-tp-color: rgb(125,206,160);
     --annotation-tp-color-lowlight: rgba(125,206,160,0.3);
     --annotation-tp-color-dark: rgb(21,55,35);
@@ -16,6 +22,7 @@
     --annotation-unknown-color-lowlight: rgba(138,220,241,0.3);
     --annotation-optional-color: rgb(211,211,211);
     --annotation-optional-color-lowlight: rgba(211,211,211,0.3);
+    --annotation-selected-color: #ffd966;
     --annotation-border-size: 5px;
 }
 
@@ -24,7 +31,7 @@ html, input, select {
 }
 
 header {
-    background-color: #004A99;
+    background-color: var(--uni-blue);
     color: white;
     margin: 0;
     padding: 5pt;
@@ -42,11 +49,15 @@ html, body {
     background-color: #eeeeee;
 }
 
+.documentation {
+    text-align: center;
+}
+.documentation a {
+    color: white;
+}
+
 .content_box {
-    margin-left: 3em;
-    margin-right: 3em;
-    margin-top: 1em;
-    margin-bottom: 2em;
+    margin: 1em 3em 2em;
     padding: 1em 2em;
     background-color: #f8f8f8;
     border: 1px solid #cccccc;
@@ -71,13 +82,21 @@ a {
 
 .with_note {
     margin-bottom: 2px;
-    padding-bottom: 0px;
+    padding-bottom: 0;
 }
 
 .note {
     font-size: 80%;
-    margin-top: 0em;
-    margin-bottom: 0em;
+    margin-top: 0;
+    margin-bottom: 0;
+}
+
+#checkbox_compare {
+    margin-top: 2em;
+}
+
+input[id$="-filter"] {
+    margin-right: 1em;
 }
 
 /* Class for tooltips in the evaluation results box */
@@ -118,15 +137,10 @@ a {
     height: 20px;
 }
 
-#top_row_container {
-    display: flex;
-    justify-content: space-between; /* Put left child at the left end and right child at the right end */
-}
-
 /* ----------------------------------------- */
 /* Begin checkboxes for showing / hiding table columns */
 #checkbox_table {
-    margin-top: 2em;
+    margin-top: 0.5em;
 }
 
 #checkbox_table td:first-child {
@@ -137,8 +151,7 @@ a {
 
 .checkboxes {
     padding: 0;
-    margin: 0;
-    margin-bottom: 1em;
+    margin: 0 0 1em;
 }
 
 .checkboxes span {
@@ -171,9 +184,25 @@ a {
     position: relative;
 }
 
+/* The goal is to visually set different tbodys apart.
+Using a border for tbody only works if the table has border-collapse: collapse set,
+but this leads to problems with sticky table components (e.g. the non-sticky part shines through the gaps).
+Moreover, the selected border color is not shown, only the background color.
+#evaluation_table_wrapper tbody { border: 10px solid white; }
+*/
+#evaluation_table_wrapper tbody:not(.all_hidden)::after
+{
+    content: '';
+    display: block;
+    height: 10px;
+}
+
 /* Make the first column of the evaluation table sticky when scrolling */
-#evaluation_table_wrapper table th:first-child,
-#evaluation_table_wrapper table td:first-child {
+#evaluation_table_wrapper table th:nth-child(1),
+#evaluation_table_wrapper table thead tr:nth-child(2) th:nth-child(2),
+#evaluation_table_wrapper table td:nth-child(1),
+#evaluation_table_wrapper table td:nth-child(2)
+{
     position: -webkit-sticky;
     position: sticky;
     left: 0;
@@ -189,8 +218,9 @@ a {
 #evaluation_table_wrapper th {
     cursor: default;
     border: 1px solid white;
-    padding-top: 4px;
-    padding-bottom: 4px;
+    border-radius: 4px;
+    padding-top: 6px;
+    padding-bottom: 6px;
 }
 #evaluation_table_wrapper thead tr:nth-child(1) {
     text-align: center;
@@ -209,7 +239,9 @@ a {
     text-align: right;
     cursor: pointer;
 }
-#evaluation_table_wrapper td:first-child {
+#evaluation_table_wrapper td:nth-child(1),
+#evaluation_table_wrapper td:nth-child(2)
+{
     text-align: left;
     white-space: nowrap;
     background: var(--cell-first-column-color);
@@ -218,6 +250,9 @@ a {
 /* Handle display of hovered and clicked rows and cells */
 #evaluation_table_wrapper tbody tr:hover td {
     background-color: var(--row-hover-color);
+}
+#evaluation_table_wrapper tbody tr.sibling_selected td {
+    background-color: var(--sibling-selected-color);
 }
 #evaluation_table_wrapper tbody tr.selected td {
     background-color: var(--row-selected-color);
@@ -263,34 +298,33 @@ a {
 }
 
 /* ----------------------------------------- */
-/* Begin latex */
+/* Begin copy table */
 
-/* Table cell for copying latex code */
-#evaluation_table_wrapper .produce_latex {
+/* Table cell for copying table code */
+#evaluation_table_wrapper .copy_table {
     cursor: pointer;
     text-align: center;
     color: transparent
 }
-#evaluation_table_wrapper .produce_latex:hover {
+#evaluation_table_wrapper .copy_table:hover {
     color: white;
 }
 
 /* Copy-notification paragraph and text area with LaTeX code for table (not shown by default) */
-div.latex {
+div.copy_table_text {
     display: none;
 }
-div.latex p {
-    color: darkred;
-    font-site: 120%;
+div.copy_table_text p {
+    color: var(--cell-header-color);
 }
-div.latex textarea {
+div.copy_table_text textarea {
     display: none;
 }
 
 /* ----------------------------------------- */
 /* Begin article results */
 
-# article_results {
+#article_results {
     padding-top: 2em;
 }
 
@@ -315,8 +349,9 @@ div.latex textarea {
 }
 
 #select_article {
+    visibility: hidden;
     display: inline;
-    padding: 5px 0px;
+    padding: 5px 0;
     margin: 0;
 }
 
@@ -345,7 +380,7 @@ div.latex textarea {
     position: absolute;
     z-index: 20;
     bottom: 100%;
-    right: 0%;
+    right: 0;
 }
 
 #annotation_explanation:hover .tooltiptext {
@@ -375,24 +410,23 @@ div.latex textarea {
     border-spacing: 0;
     border-collapse: separate;
     overflow: hidden;
-    padding-top: 3em;
+    padding-top: 4em;
     padding-bottom: 4em;
 }
 
 .article_table td {
     vertical-align: top;
     line-height: 220%;
-    padding-top: 3em;
-    padding-bottom: 3em;
+    padding: 3em 1em;
 }
 
 .article_table td,
 .article_table th {
-    border: 1px solid #aaa;
+    border: 1px solid var(--cell-first-column-color);
 }
 
 .article_table th {
-    background: var(--cell-header-color);
+    background: var(--cell-first-column-color);
 }
 
 .article_table hr {
@@ -400,7 +434,7 @@ div.latex textarea {
     height: 1px;
     border: 0;
     border-top: 1px solid #ccc;
-    margin: 2em 0em;
+    margin: 2em 0;
     padding: 0;
 }
 
@@ -486,10 +520,10 @@ div.latex textarea {
 }
 
 .annotation.gt.selected {
-    border-bottom-color: var(--cell-selected-color);
+    border-bottom-color: var(--annotation-selected-color);
 }
 .annotation.pred.selected {
-    background-color: var(--cell-selected-color);
+    background-color: var(--annotation-selected-color);
 }
 
 /* ----------------------------------------- */
@@ -505,11 +539,10 @@ div.latex textarea {
     text-align: left;
     padding: 5px;
     border-radius: 6px;
-    border: 3px solid white;
+    border: 3px solid lightgrey;
     line-height: 120%;
     background-color: white;
     white-space: nowrap;
-    border-color: lightgrey;
 
     /* Position of the tooltip text.
     Don't set position absolute yet because tooltips for annotations at the right table edge would stretch
@@ -574,7 +607,7 @@ div.latex textarea {
     background-color: var(--annotation-fp-color);
 }
 .annotation .tooltiptext.tp .error_category_tag {
-    color: var(----annotation-tp-color-dark);
+    color: var(--annotation-tp-color-dark);
     background-color: var(--annotation-tp-color);
 }
 
@@ -608,7 +641,7 @@ div.latex textarea {
 }
 
 #error_explanation {
-    padding: 0% 10%;
+    padding: 0 10%;
     text-align: center;
     font-style: italic;
 }
@@ -695,6 +728,60 @@ textarea {
     background-color: #333333;
 }
 
+.btn-primary {
+    color: #ffffff;
+    background-color: #337ab7;
+    border-color: #2e6da4;
+}
+.btn-primary:focus,
+.btn-primary.focus {
+    color: #ffffff;
+    background-color: #286090;
+    border-color: #122b40;
+}
+.btn-primary:hover {
+    color: #ffffff;
+    background-color: #286090;
+    border-color: #204d74;
+}
+.btn-primary:active,
+.btn-primary.active,
+.open > .dropdown-toggle.btn-primary {
+    color: #ffffff;
+    background-color: #286090;
+    background-image: none;
+    border-color: #204d74;
+}
+.btn-primary:active:hover,
+.btn-primary.active:hover,
+.open > .dropdown-toggle.btn-primary:hover,
+.btn-primary:active:focus,
+.btn-primary.active:focus,
+.open > .dropdown-toggle.btn-primary:focus,
+.btn-primary:active.focus,
+.btn-primary.active.focus,
+.open > .dropdown-toggle.btn-primary.focus {
+    color: #ffffff;
+    background-color: #204d74;
+    border-color: #122b40;
+}
+.btn-primary.disabled:hover,
+.btn-primary[disabled]:hover,
+fieldset[disabled] .btn-primary:hover,
+.btn-primary.disabled:focus,
+.btn-primary[disabled]:focus,
+fieldset[disabled] .btn-primary:focus,
+.btn-primary.disabled.focus,
+.btn-primary[disabled].focus,
+fieldset[disabled] .btn-primary.focus {
+    background-color: #337ab7;
+    border-color: #2e6da4;
+}
+.btn-primary .badge {
+    color: #337ab7;
+    background-color: #ffffff;
+}
+
 /* ----------------------------------------- */
 /* Begin bootstrap style modal
 
@@ -775,7 +862,6 @@ button.close {
   background-color: #ffffff;
   -webkit-background-clip: padding-box;
   background-clip: padding-box;
-  border: 1px solid #999999;
   border: 1px solid rgba(0, 0, 0, 0.2);
   border-radius: 6px;
   -webkit-box-shadow: 0 3px 9px rgba(0, 0, 0, 0.5);

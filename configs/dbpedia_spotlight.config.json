@@ -1,5 +1,0 @@
-{
-  "name": "DBpediaSpotlight",
-  "api_url": "https://api.dbpedia-spotlight.org/en/annotate",
-  "confidence": 0.35
-}

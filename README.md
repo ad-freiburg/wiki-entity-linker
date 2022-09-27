@@ -13,7 +13,11 @@ Get the code, and build and start the docker container:
 where `<data_directory>` is the directory in which the required data files will be stored. What these data files are
  and how they are generated is explained in section [Get the Data](#get-the-data). Make sure you can read from and
  write to all directories that are being mounted as volumes from within the docker container (i.e. your
- `<data_directory>`, `evaluation-results` and `benchmarks`).
+ `<data_directory>`, `evaluation-results` and `benchmarks`), for example (if security is not an issue) by giving all
+ users read and write permissions to the directories in question with:
+
+    chmod a+rw -R <data_directory> evaluation-results/ benchmarks/
+
 
 Unless otherwise noted, all the following commands should be run inside the docker container. If you want to use the
  system without docker, follow the instructions in [Setup without Docker](docs/setup_without_docker.md) before
@@ -111,7 +115,7 @@ You can easily add a benchmark if you have a benchmark file that is in the
 
 To add a benchmark, simply run
 
-    python3 annotate_and_add_benchmark.py -name <benchmark_name> -bfile <benchmark_file> -bformat <ours|nif|aida-conll|simple_jsonl>
+    python3 add_benchmark.py <benchmark_name> -bfile <benchmark_file> -bformat <ours|nif|aida-conll|simple-jsonl>
 
 This converts the `<benchmark_file>` into our JSONL format (if it is not in this format already), annotates ground
  truth labels with their Wikidata label and Wikidata types and writes the result to the file
@@ -137,7 +141,9 @@ To link the articles of a benchmark with a single linker configuration, use the 
     python3 link_benchmark_entities.py <experiment_name> -l <linker_name> -b <benchmark_name>
 
 The linking results will be written to
- `evaluation-results/<linker_name>/<experiment_name>.<benchmark_name>.linked_articles.jsonl`.
+ `evaluation-results/<linker_name>/<adjusted_experiment_name>.<benchmark_name>.linked_articles.jsonl` where
+ `<adjusted_experiment_name>` is `<experiment_name>` in lowercase and characters other than `[a-z0-9-]` replaced by
+ `_`.
 For example
 
     python3 link_benchmark_entities.py ltl.popular_entities.entity_coref -l popular_entities -b wiki-ex -ll link-text-linker -coref entity
@@ -146,6 +152,7 @@ will create the file
  `evaluation-results/popular_entities/ltl.popular_entities.entity_coref.wiki-ex.linked_articles.jsonl`. The result
  file contains one article as JSON object per line. Each JSON object contains benchmark article information such as
  the article title, text, and ground truth labels, as well as the entity mentions produced by the specified linker.
+
  `<experiment_name>` is the name that will be displayed in the first column of the evaluation results table in the
  web app.
 
@@ -159,15 +166,16 @@ To evaluate a linker's predictions use the script `evaluate_linking_results.py`:
 
     python3 evaluate_linking_results.py <path_to_linking_result_file>
 
-This will print precision, recall and F1 scores and create two new files where the `linked_articles.jsonl` file extension is
- replaced by `.eval_cases.jsonl` and `.eval_results.json` respectively. For example
+This will print precision, recall and F1 scores and create two new files where the `linked_articles.jsonl` file
+ extension is replaced by `.eval_cases.jsonl` and `.eval_results.json` respectively. For example
 
-    python3 evaluate_linking_results.py evaluation-results/popular_entities/ltl.popular_entities.entity_coref.wiki-ex.linked_entities.jsonl
+    python3 evaluate_linking_results.py evaluation-results/popular_entities/ltl.popular_entities.entity_coref.wiki-ex.linked_articles.jsonl
 
 will create the files `evaluation-results/popular_entities/ltl.popular_entities.entity_coref.wiki-ex.eval_cases.jsonl` 
  and `evaluation-results/popular_entities/ltl.popular_entities.entity_coref.wiki-ex.eval_results.json`. The 
  `eval_cases` file contains information about each true positive, false positive and false negative case. The
  `eval_results` file contains the scores that are shown in the web app's evaluation results table.
+
 
 In the web app, simply reload the page and the experiment will show up as a row in the evaluation results table of
  the corresponding benchmark.

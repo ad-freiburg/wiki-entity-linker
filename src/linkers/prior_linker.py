@@ -21,7 +21,7 @@ class PriorLinker(AbstractEntityLinker):
         self.model = spacy.load(settings.LARGE_MODEL_NAME)
 
         # Get config variables
-        self.linker_identifier = config["name"] if "name" in config else "Prior"
+        self.linker_identifier = config["linker_name"] if "linker_name" in config else "Prior"
         self.ner_identifier = self.linker_identifier
         whitelist_type_file = config["whitelist_type_file"] if "whitelist_type_file" in config \
             else settings.WHITELIST_FILE
@@ -55,7 +55,16 @@ class PriorLinker(AbstractEntityLinker):
                 else:
                     lower_sent = lower_sents[sent_span]
                 idx_in_sent = OffsetConverter.get_token_idx_in_sent(tok.idx, doc)
-                if lower_sent[idx_in_sent].pos_ == "PROPN":
+
+                # Tokenization of lower_sent can differ from doc in rare cases.
+                # Make sure indices are in range.
+                if idx_in_sent >= len(lower_sent) or lower_sent[idx_in_sent].text != tok.text.lower():
+                    if idx_in_sent < len(lower_sent):
+                        for i, t in enumerate(lower_sent):
+                            if t.text == tok.text.lower():
+                                idx_in_sent = i
+
+                if idx_in_sent < len(lower_sent) and lower_sent[idx_in_sent].pos_ == "PROPN":
                     new_text += tok.text[0] + tok.text[1:].lower()
                 else:
                     new_text += tok.text.lower()
@@ -91,7 +100,7 @@ class PriorLinker(AbstractEntityLinker):
                 if mention_end < len(doc) and doc[mention_end].pos_ == "PROPN" and len(doc[mention_end]) > 1:
                     skip = True
                 contains_noun = [True for tok in doc[mention_start:mention_end] if tok.pos_ in ["PROPN", "NOUN"]]
-            # For the pos_prior linker, require at least one noun in the mention tokens
+            # For the pos-prior linker, require at least one noun in the mention tokens
             if not skip and len(mention_text) > 1:
                 # Only consider span as mention span if it contains at least one noun
                 yield span, mention_text, n_tokens, contains_noun

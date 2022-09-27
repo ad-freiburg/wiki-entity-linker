@@ -18,29 +18,12 @@
 	<body>
 		<header>
 			<h1>ELEVANT: Entity Linking Evaluation and Analysis Tool</h1>
+			<div class="documentation">A complete documentation can be found on <b><a href="https://github.com/ad-freiburg/elevant/">GitHub</a></b>.</div>
+			<div class="documentation">A demo video can be found on <b><a href="https://youtu.be/iK5UwrEoMwY">YouTube</a></b>.</div>
 		</header>
 
-		<div class="content_box">
-			<div id="top_row_container">
-				<div>
-					<table><tbody>
-						<tr><td>Select a benchmark: </td><td><select id="benchmark" class="btn btn-default dropdown-toggle" onchange="show_benchmark_results(false)"></select></td></tr>
-						<tr><td>Filter results by keywords: </td><td><input id="result-filter"></td></tr>
-					</tbody></table>
-				</div>
-			</div>
-
-			<div>
-				<input type="checkbox" id="checkbox_deprecated" onchange="toggle_show_deprecated()">
-				<label for="checkbox_deprecated">Show deprecated</label>
-			</div>
-
-			<div>
-				<input type="checkbox" id="checkbox_compare" onchange="toggle_compare()">
-				<label for="checkbox_compare">Compare two systems</label>
-			</div>
-
-			<!-- Modal -->
+		<div id="evaluation_overview" class="content_box">
+			<!-- Example Benchmark Modal -->
 			<div class="modal" id="example_benchmark_modal" tabindex="-1" role="dialog">
 				<div id="example_benchmark_modal_dialog" class="modal-dialog modal-dialog-centered" role="document">
 					<div class="modal-content">
@@ -62,26 +45,68 @@
 					</div>
 				</div>
 			</div>
-		</div>
 
-		<div id="evaluation_overview" class="content_box">
+			<!-- Copy Table Modal -->
+			<div class="modal" id="copy_table_modal" tabindex="-1" role="dialog">
+				<div id="copy_table_modal_dialog" class="modal-dialog modal-dialog-centered" role="document">
+					<div class="modal-content">
+						<div class="modal-header">
+							<span class="modal-title"><b>Copy evaluation results table</b></span>
+							<button type="button" class="close" data-dismiss="modal">
+								<span>&times;</span>
+							</button>
+						</div>
+						<div class="modal-body">
+							<h4 class="with_note">Settings</h4>
+							<div><input type="checkbox" id="checkbox_include_experiment" checked><label for="checkbox_include_experiment">Include experiment column</label></div>
+							<div><input type="checkbox" id="checkbox_include_benchmark"><label for="checkbox_include_benchmark">Include benchmark column</label></div>
+							<h4 class="with_note">Format</h4>
+							<div id="copy_as" class="checkboxes">
+								<span><input type="radio" id="radio_copy_as_tsv" name="copy_as" value="TSV" checked><label for="radio_copy_as_tsv">TSV</label></span>
+								<span><input type="radio" id="radio_copy_as_latex" name="copy_as" value="LATEX"><label for="radio_copy_as_latex">LaTeX</label></span>
+							</div>
+							<div class="copy_table_text">
+								<p><b>The code for the evaluation results table was copied to your CLIPBOARD.</b></p>
+								<textarea></textarea>
+							</div>
+						</div>
+						<div class="modal-footer">
+							<button type="button" class="btn btn-primary" onclick="copy_table()">Copy</button>
+							<button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+						</div>
+					</div>
+				</div>
+			</div>
+
 			<h3 class="with_note">Evaluation results</h3>
-			<p class="note">Select a checkbox to show evaluation results for that category. Hover over a checkbox label for an explanation of the category.</p>
+
+			<h4 class="with_note">Evaluation mode</h4>
+			<div id="evaluation_modes" class="checkboxes"></div>
+
+			<h4 class="with_note">Result categories</h4>
 			<div id="checkbox_table_wrapper">
+				<p class="note">Select a checkbox to see evaluation results for that category. Hover over a checkbox label for an explanation of the category.</p>
 				<table id="checkbox_table">
 					<tbody>
-						<tr><td><b>Mention types:</b></td><td><div id="mention_type_checkboxes" class="checkboxes"></div></td></tr>
-						<tr><td><b>Error categories:</b></td><td><div id="error_category_checkboxes" class="checkboxes"></div></td></tr>
-						<tr><td><b>Entity types:</b></td><td><div id="entity_type_checkboxes" class="checkboxes"></div></td></tr>
-						<tr><td><b>Evaluation mode:</b></td><td><div id="evaluation_modes" class="checkboxes"></div></td></tr>
+						<tr><td><i>Mention types:</i></td><td><div id="mention_type_checkboxes" class="checkboxes"></div></td></tr>
+						<tr><td><i>Error categories:</i></td><td><div id="error_category_checkboxes" class="checkboxes"></div></td></tr>
+						<tr><td><i>Entity types:</i></td><td><div id="entity_type_checkboxes" class="checkboxes"></div></td></tr>
 					</tbody>
 				</table>
 			</div>
 
-			<div class="latex">
-				<p><b>The LaTeX code for this table was copied to your CLIPBOARD.</b></p>
-				<textarea></textarea>
+			<h4 class="with_note">Group table rows</h4>
+			<div id="group_by" class="checkboxes">
+				<span><input type="radio" id="radio_group_by_experiment" name="group_by" value="experiment" onchange="on_group_by_change(this)"><label for="radio_group_by_experiment">By experiment</label></span>
+				<span><input type="radio" id="radio_group_by_benchmark" name="group_by" value="benchmark" onchange="on_group_by_change(this)" checked><label for="radio_group_by_benchmark">By benchmark</label></span>
 			</div>
+
+			<h4 class="with_note">Filter table rows</h4>
+			<label for="experiment-filter">By experiment: </label><input id="experiment-filter">
+			<label for="benchmark-filter">By benchmark: </label><input id="benchmark-filter">
+			<span data-tippy-content="Show experiments whose name contains the word 'deprecated'.">
+				<input type="checkbox" id="checkbox_deprecated" onchange="toggle_show_deprecated()"><label for="checkbox_deprecated">Show deprecated</label>
+			</span>
 
 			<div id="table_loading"></div>
 
@@ -98,7 +123,15 @@
 		</div>
 
 		<div id="article-results" class="content_box">
-			<h3>Linking results</h3>
+			<h3 class="with_note">Linking results</h3>
+			<p class="note">Select a cell in the evaluation results table above to see the linking results of the selected experiment here.</p>
+
+			<div>
+				<span data-tippy-content="Compare linking results of two systems side by side. Select two experiments in the table above to compare them.">
+					<input type="checkbox" id="checkbox_compare" onchange="toggle_compare()">
+					<label for="checkbox_compare">Compare two systems</label>
+				</span>
+			</div>
 
 			<div id="loading"></div>
 
@@ -131,16 +164,20 @@
 									<td><b>False negative:</b> Groundtruth mention either does not match a predicted mention span or the predicted entity does not match the groundtruth entity</td>
 								</tr>
 								<tr>
-									<td><span class="annotation gt unknown">Mention Text</span></td>
-									<td>Groundtruth entity that could not be mapped to an entity in the knowledge base</td>
+									<td><span class="annotation pred unknown">Mention Text</span></td>
+									<td>Unknown predicted entity that could not be mapped to an entity in the knowledge base (= unknown) and is unevaluated</td>
 								</tr>
 								<tr>
-									<td><span class="annotation gt optional">Mention Text</span></td>
-									<td>Optional groundtruth mention</td>
+									<td><span class="annotation gt unknown">Mention Text</span></td>
+									<td>Groundtruth entity that could not be mapped to an entity in the knowledge base (= unknown) and is unevaluated</td>
 								</tr>
 								<tr>
 									<td><span class="annotation pred unevaluated">Mention Text</span></td>
 									<td>Prediction is unevaluated either because it matches an optional groundtruth mention span and entity or because it is outside of the evaluation span</td>
+								</tr>
+								<tr>
+									<td><span class="annotation gt optional">Mention Text</span></td>
+									<td>Optional groundtruth mention</td>
 								</tr>
 								<tr>
 									<td><u>Some Text</u></td>

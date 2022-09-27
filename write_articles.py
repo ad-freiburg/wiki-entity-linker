@@ -89,16 +89,16 @@ def get_ner_text(article, text, offset):
     if article.labels is None:
         return text
 
-    for span, label in sorted(article.labels, reverse=True):
-        if label is None or label.startswith("Unknown"):
-            # Exclude unknown GT entities, since they cannot be correctly linked without predicting NIL
-            continue
-        begin, end = span
-        begin -= offset
-        end -= offset
-        mention_text_snippet = text[begin:end]
-        mention_string = "[[%s]]" % mention_text_snippet
-        text = text[:begin] + mention_string + text[end:]
+    for label in sorted(article.labels, reverse=True):
+        if label.parent is None and not label.is_optional():
+            if label.entity_id.startswith("Unknown"):  # and False:
+                continue
+            begin, end = label.span
+            begin -= offset
+            end -= offset
+            mention_text_snippet = text[begin:end]
+            mention_string = "[[%s]]" % mention_text_snippet
+            text = text[:begin] + mention_string + text[end:]
     return text
 
 
@@ -175,8 +175,8 @@ def main(args):
         logger.error("%s is not a directory." % args.output_dir)
         exit(1)
 
-    if args.input_benchmark:
-        article_text_iterator = get_example_generator(args.input_benchmark).iterate(args.n_articles)
+    if args.benchmark:
+        article_text_iterator = get_example_generator(args.benchmark).iterate(args.n_articles)
     elif args.input_wiki_dump:
         article_text_iterator = WikipediaDumpReader.article_iterator(args.n_articles)
     else:
@@ -261,7 +261,7 @@ if __name__ == "__main__":
     group_input.add_argument("-i", "--input_file", type=str,
                              help="Input file with one article per line in jsonl format.")
 
-    group_input.add_argument("-b", "--input_benchmark", choices=get_available_benchmarks(),
+    group_input.add_argument("-b", "--benchmark", choices=get_available_benchmarks(),
                              help="Iterate over benchmark articles of the given benchmark.")
 
     group_input.add_argument("--input_wiki_dump", default=False, action="store_true",
@@ -285,7 +285,7 @@ if __name__ == "__main__":
                         help="Maximum number of articles to process.")
 
     parser.add_argument("--evaluation_span", default=False, action="store_true",
-                        help="Write only sentences within the evaluation span (iff input_benchmark is set).")
+                        help="Write only sentences within the evaluation span (iff benchmark is set).")
 
     parser.add_argument("--article_header", default=False, action="store_true",
                         help="Write header for each article with title and id.")

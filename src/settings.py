@@ -67,14 +67,14 @@ UNIGRAMS_FILE = DATA_DIRECTORY + "wikipedia_mappings/unigrams.txt"
 WIKIPEDIA_ABSTRACTS_FILE = DATA_DIRECTORY + "wikipedia_mappings/article_abstracts.tsv"
 
 # Spacy knowledge base files
-KB_FILE = DATA_DIRECTORY + "spacy_knowledge_bases/wikidata/kb"
-KB_DIRECTORY = DATA_DIRECTORY + "spacy_knowledge_bases/"
-VOCAB_DIRECTORY = DATA_DIRECTORY + "spacy_knowledge_bases/wikidata/vocab"
-VECTORS_DIRECTORY = DATA_DIRECTORY + "spacy_knowledge_bases/vectors/vectors"
-VECTORS_ABSTRACTS_DIRECTORY = DATA_DIRECTORY + "spacy_knowledge_bases/vectors/vectors_abstracts/"
+KB_FILE = DATA_DIRECTORY + "linker_files/spacy/knowledge_bases/wikidata/kb"
+KB_DIRECTORY = DATA_DIRECTORY + "linker_files/spacy/knowledge_bases/"
+VOCAB_DIRECTORY = DATA_DIRECTORY + "linker_files/spacy/knowledge_bases/wikidata/vocab"
+VECTORS_DIRECTORY = DATA_DIRECTORY + "linker_files/spacy/knowledge_bases/vectors/vectors"
+VECTORS_ABSTRACTS_DIRECTORY = DATA_DIRECTORY + "linker_files/spacy/knowledge_bases/vectors/vectors_abstracts/"
 
 # Linker files
-LINKERS_DIRECTORY = DATA_DIRECTORY + "linker_files/trained_spacy_linker_models/"
+SPACY_MODEL_DIRECTORY = DATA_DIRECTORY + "linker_files/spacy/models/"
 
 LINKER_MODEL_PATH = DATA_DIRECTORY + "linker_files/nn_linker_models/"
 RDF2VEC_MODEL_PATH = DATA_DIRECTORY + "linker_files/entity_embeddings/wikid2vec_sg_500_7_4_15_4_500"

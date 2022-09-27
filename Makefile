@@ -25,11 +25,11 @@ WIKIPEDIA_MAPPINGS_DIR = ${DATA_DIR}wikipedia_mappings/
 # Variables for benchmark linking and evaluation
 EVALUATION_RESULTS_DIR = evaluation-results/
 # Adjust if you only want to link or evaluate certain benchmarks
-BENCHMARK_NAMES = wiki-ex newscrawl aida-conll-test msnbc kore50 spotlight aida-conll-dev msnbc-updated
+BENCHMARK_NAMES = kore50 msnbc msnbc-updated spotlight # aida-conll-test aida-conll-dev
 # Adjust if you only want to link with certain linking systems.
 # The script arguments for a linking system can be adjusted in the link_benchmark target if needed.
-LINKING_SYSTEMS = baseline pos_prior tagme dbpedia_spotlight popular_entities explosion spacy.prior_trained spacy.wikipedia
-PREDICTIONS = neural_el wikifier ambiverse
+LINKING_SYSTEMS = dbpedia-spotlight tagme baseline # spacy.wikipedia spacy.wikidata
+PREDICTIONS = # neural-el ambiverse
 # Edit if you only want to evaluate a linking system that matches a certain prefix.
 EVALUATE_LINKING_SYSTEM_PREFIX =
 
@@ -66,8 +66,20 @@ link_benchmarks:
 	@echo
 	@echo "BENCHMARK_NAMES = $(BENCHMARK_NAMES)"
 	@echo "LINKING_SYSTEMS = $(LINKING_SYSTEMS)"
-	for BENCHMARK_NAME in $(BENCHMARK_NAMES); do echo; \
-	  $(MAKE) -sB BENCHMARK=$${BENCHMARK_NAME} link_benchmark; \
+	for SYSTEM in $(LINKING_SYSTEMS); do \
+	  echo; \
+	  ARGUMENTS=""; \
+	  RESULT_NAME=$${SYSTEM}; \
+	  if [ $${SYSTEM} == "spacy.wikidata" ]; then \
+	    SYSTEM=spacy; \
+	    RESULT_NAME=$${SYSTEM}.wikidata; \
+	    ARGUMENTS="--linker_config configs/spacy_wikidata.config.json"; \
+	  elif [ $${SYSTEM} == "spacy.wikipedia" ]; then \
+	    SYSTEM=spacy; \
+	    RESULT_NAME=$${SYSTEM}.wikipedia; \
+	  fi; \
+	  echo -e "$${DIM}python3 link_benchmark_entities.py $${RESULT_NAME} -l $${SYSTEM} -b ${BENCHMARK_NAMES} -dir ${EVALUATION_RESULTS_DIR} $${ARGUMENTS}$${RESET}"; \
+	  python3 link_benchmark_entities.py $${RESULT_NAME} -l $${SYSTEM} -b ${BENCHMARK_NAMES} -dir ${EVALUATION_RESULTS_DIR} $${ARGUMENTS}; \
 	done
 	@echo
 
@@ -82,42 +94,35 @@ convert_predictions:
 	done
 	@echo
 
-link_benchmark:
-	for SYSTEM in $(LINKING_SYSTEMS); do \
-	  echo "BENCHMARK: $${BENCHMARK}"; \
-	  echo "LINKING SYSTEM: $${SYSTEM}"; \
-	  ARGUMENTS=""; \
-	  RESULT_NAME=$${SYSTEM}; \
-	  if [ $${SYSTEM} == "spacy.prior_trained" ]; then \
-	    SYSTEM=spacy; \
-	    RESULT_NAME=$${SYSTEM}.prior_trained; \
-	  elif [ $${SYSTEM} == "spacy.wikipedia" ]; then \
-	    SYSTEM=spacy; \
-	    ARGUMENTS="--linker_config configs/spacy_wikipedia.config.json"; \
-	    RESULT_NAME=$${SYSTEM}.wikipedia; \
-	  fi; \
-	  python3 link_benchmark_entities.py $${RESULT_NAME} -l $${SYSTEM} -b $${BENCHMARK} -dir $${EVALUATION_RESULTS_DIR} $${ARGUMENTS}; \
-	done
-
 convert_benchmark_predictions:
 	for PREDICTION in $(PREDICTIONS); do \
+	  echo; \
 	  echo "BENCHMARK: $${BENCHMARK}"; \
 	  echo "PREDICTIONS FROM: $${PREDICTION}"; \
 	  RESULT_NAME=$${PREDICTION}; \
 	  if [ $${PREDICTION} == "ambiverse" ]; then \
 	    PFILE=/nfs/students/natalie-prange/ambiverse_data/results/benchmark_$${BENCHMARK}/; \
 	    PFORMAT=ambiverse; \
-	  elif [ $${PREDICTION} == "neural_el" ]; then \
+	    PNAME=Ambiverse; \
+	  elif [ $${PREDICTION} == "neural-el" ]; then \
 	    PFILE=/nfs/students/natalie-prange/neural-el-data/results/linked_articles_$${BENCHMARK}.jsonl; \
-	    PFORMAT=simple_jsonl; \
+	    PFORMAT=simple-jsonl; \
+	    PNAME="Neural EL"; \
 	  elif [ $${PREDICTION} == "wikifier" ]; then \
 	    PFILE=/nfs/students/natalie-prange/wikifier_data/output/benchmark_$${BENCHMARK}/; \
 	    PFORMAT=wikifier; \
+	    PNAME=Wikifier; \
 	  else \
 	    echo -e "$${DIM}No rule for predictions from $${PREDICTION} found in Makefile.$${RESET}"; \
 	    continue; \
 	  fi; \
-	  python3 link_benchmark_entities.py $${RESULT_NAME} -pfile $${PFILE} -pformat $${PFORMAT} -pname $${PREDICTION} -b $${BENCHMARK} -dir $${EVALUATION_RESULTS_DIR}; \
+	  python3 link_benchmark_entities.py $${RESULT_NAME} -pfile $${PFILE} -pformat $${PFORMAT} -pname "$${PNAME}" -b $${BENCHMARK} -dir $${EVALUATION_RESULTS_DIR}; \
+	done
+
+get_oracle_predictions:
+	@[ -d ${EVALUATION_RESULTS_DIR}oracle/ ] || mkdir ${EVALUATION_RESULTS_DIR}oracle/
+	for BENCHMARK in $(BENCHMARK_NAMES); do echo; \
+		python3 get_oracle_predictions.py ${EVALUATION_RESULTS_DIR}oracle/oracle.$${BENCHMARK}.linked_articles.jsonl -b $${BENCHMARK}; \
 	done
 
 evaluate_linking_results:
@@ -126,22 +131,12 @@ evaluate_linking_results:
 	@echo
 	@echo "BENCHMARK_NAMES = $(BENCHMARK_NAMES)"
 	@echo "EVALUATION_RESULTS_DIR = $(EVALUATION_RESULTS_DIR)"
+	@echo "EVALUATE_LINKING_SYSTEM_PREFIX = $(EVALUATE_LINKING_SYSTEM_PREFIX)"
 	@echo
-	for FILENAME in ${EVALUATION_RESULTS_DIR}*/*.jsonl ; do \
-	  BENCHMARK_SUFFIX=$$(echo $${FILENAME} | sed -r 's|.+\.([^\.]*)\.jsonl|\1|') ; \
-	  HAS_SYSTEM_PREFIX=$$(echo $${FILENAME} | sed 's|${EVALUATE_LINKING_SYSTEM_PREFIX}||') ; \
-	  if [[ "$${HAS_SYSTEM_PREFIX}" == "$${FILENAME}" ]]; then \
-	    echo -e "$${DIM}Skipping $${FILENAME} because filename does not match EVALUATE_LINKING_SYSTEM_PREFIX$${RESET}"; \
-	    continue; \
-	  fi; \
-	  echo "FILENAME = $${FILENAME}"; \
-	  echo "BENCHMARK_SUFFIX = $${BENCHMARK_SUFFIX}"; \
-	  if [[ " $${BENCHMARK_NAMES[*]} " =~ " $${BENCHMARK_SUFFIX} " ]]; then \
-		python3 evaluate_linking_results.py $${FILENAME} -b $${BENCHMARK_SUFFIX}; \
-	  else \
-	    echo -e "$${DIM}Skipping file because benchmark suffix is not in BENCHMARK_NAMES$${RESET}"; \
-	  fi; \
-	  echo; \
+	for BENCHMARK in $(BENCHMARK_NAMES); do \
+		echo; \
+		echo -e "$${DIM}python3 evaluate_linking_results.py ${EVALUATION_RESULTS_DIR}*/${EVALUATE_LINKING_SYSTEM_PREFIX}*$${BENCHMARK}.linked_articles.jsonl -b $${BENCHMARK}$${RESET}"; \
+		python3 evaluate_linking_results.py ${EVALUATION_RESULTS_DIR}*/${EVALUATE_LINKING_SYSTEM_PREFIX}*$${BENCHMARK}.linked_articles.jsonl -b $${BENCHMARK}; \
 	done
 
 # Only clone or build qlever if no qlever.master docker image exists
@@ -178,6 +173,13 @@ download_entity_types_mapping:
 	wget https://ad-research.cs.uni-freiburg.de/data/entity-linking/entity-types.tar.gz
 	tar -xvzf entity-types.tar.gz -C ${WIKIDATA_MAPPINGS_DIR}
 	rm entity-types.tar.gz
+
+download_spacy_linking_files:
+	@[ -d ${DATA_DIR}linker_files ] || mkdir ${DATA_DIR}linker_files
+	wget https://ad-research.cs.uni-freiburg.de/data/entity-linking/spacy_linker_files.tar.gz
+	tar -xvzf spacy_linker_files.tar.gz -C ${DATA_DIR}linker_files
+	rm spacy_linker_files.tar.gz
+
 
 # Download Wikipedia dump only if it does not exist already at the specified location.
 download_wiki:

@@ -4,6 +4,7 @@ from typing import Optional, Tuple, Dict, Set, Any
 
 from src.prediction_readers.wexea_prediction_reader import WexeaPredictionReader
 from src.linkers.dbpedia_spotlight_linker import DbpediaSpotlightLinker
+from src.prediction_readers.epgel_prediction_reader import EPGELPredictionReader
 from src.prediction_readers.simple_jsonl_prediction_reader import SimpleJsonlPredictionReader
 from src.prediction_readers.nif_prediction_reader import NifPredictionReader
 from src.prediction_readers.wikifier_prediction_reader import WikifierPredictionReader
@@ -17,8 +18,6 @@ from src.linkers.prior_linker import PriorLinker
 from src.linkers.trained_entity_linker import TrainedEntityLinker
 from src.linkers.link_entity_linker import LinkEntityLinker
 from src.linkers.link_text_entity_linker import LinkTextEntityLinker
-from src.linkers.explosion_linker import ExplosionEntityLinker
-from src.linkers.hobbs_coref_linker import HobbsCorefLinker
 from src.linkers.neuralcoref_coref_linker import NeuralcorefCorefLinker
 from src.linkers.stanford_corenlp_coref_linker import StanfordCoreNLPCorefLinker
 from src.linkers.tagme_linker import TagMeLinker
@@ -52,8 +51,7 @@ class LinkingSystem:
         self.entity_db = None
         self.globally = False
         self.type_mapping_file = type_mapping_file  # Only needed for pure prior linker
-        self.linker_config = None
-        self.linker_config = self.get_linker_config(linker_name, config_path) if linker_name else None
+        self.linker_config = self.read_linker_config(linker_name, config_path) if linker_name else {}
 
         self._initialize_entity_db(linker_name, link_linker, coref_linker, min_score)
         self._initialize_link_linker(link_linker)
@@ -72,7 +70,7 @@ class LinkingSystem:
                                                           type_mapping=self.type_mapping_file)
 
     @staticmethod
-    def get_linker_config(linker_name: str, config_path: Optional[str] = None) -> Dict[str, Any]:
+    def read_linker_config(linker_name: str, config_path: Optional[str] = None) -> Dict[str, Any]:
         """
         Get config dictionary for the specified linker or config path.
         """
@@ -90,6 +88,9 @@ class LinkingSystem:
                 linker_config = json.load(file)
             return linker_config
 
+    def get_linker_config(self) -> Dict[str, Any]:
+        return self.linker_config
+
     def _initialize_linker(self, linker_name: str, prediction_file: str, prediction_format: str):
         if linker_name:
             logger.info("Initializing linker %s with config parameters %s ..." % (linker_name, self.linker_config))
@@ -104,8 +105,6 @@ class LinkingSystem:
 
         if linker_type == Linkers.SPACY.value:
             self.linker = SpacyLinker(self.entity_db, self.linker_config)
-        elif linker_type == Linkers.EXPLOSION.value:
-            self.linker = ExplosionEntityLinker(self.entity_db, self.linker_config)
         elif linker_type == PredictionFormats.AMBIVERSE.value:
             self.load_missing_mappings({MappingName.WIKIPEDIA_WIKIDATA,
                                         MappingName.REDIRECTS})
@@ -166,6 +165,8 @@ class LinkingSystem:
             self.load_missing_mappings({MappingName.WIKIPEDIA_WIKIDATA,
                                         MappingName.REDIRECTS})
             self.prediction_reader = NifPredictionReader(prediction_file, self.entity_db)
+        elif linker_type == PredictionFormats.EPGEL.value:
+            self.prediction_reader = EPGELPredictionReader(prediction_file)
         elif linker_type == Linkers.DBPEDIA_SPOTLIGHT.value:
             self.load_missing_mappings({MappingName.WIKIPEDIA_WIKIDATA,
                                         MappingName.REDIRECTS})
@@ -217,8 +218,6 @@ class LinkingSystem:
             self.coref_linker = StanfordCoreNLPCorefLinker()
         elif linker_type == CoreferenceLinkers.XRENNER.value:
             self.coref_linker = XrennerCorefLinker()
-        elif linker_type == CoreferenceLinkers.HOBBS.value:
-            self.coref_linker = HobbsCorefLinker(self.entity_db)
         elif linker_type == CoreferenceLinkers.WEXEA.value:
             self.load_missing_mappings({MappingName.WIKIPEDIA_WIKIDATA,
                                         MappingName.REDIRECTS})

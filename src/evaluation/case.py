@@ -13,7 +13,6 @@ logger = logging.getLogger("main." + __name__.split(".")[-1])
 
 class EvaluationMode(Enum):
     IGNORED = "IGNORED"
-    OPTIONAL = "OPTIONAL"
     REQUIRED = "REQUIRED"
 
 
@@ -26,7 +25,7 @@ class EvaluationType(Enum):
 class ErrorLabel(Enum):
     # detection
     UNDETECTED = "UNDETECTED"
-    UNDETECTED_LOWERCASE = "UNDETECTED_LOWERCASE"
+    UNDETECTED_LOWERCASED = "UNDETECTED_LOWERCASED"
     UNDETECTED_PARTIALLY_INCLUDED = "UNDETECTED_PARTIALLY_INCLUDED"
     UNDETECTED_PARTIAL_OVERLAP = "UNDETECTED_PARTIAL_OVERLAP"
     UNDETECTED_OTHER = "UNDETECTED_OTHER"
@@ -74,7 +73,7 @@ class Case:
                  predicted_entity: Optional[WikidataEntity],
                  candidates: Set[WikidataEntity],
                  predicted_by: str,
-                 error_labels: Optional[Set[ErrorLabel]] = None,
+                 error_labels: Optional[Dict[EvaluationMode, Set[ErrorLabel]]] = None,
                  factor: Optional[float] = None,
                  child_linking_eval_types: Optional[Dict[EvaluationMode, Set[EvaluationType]]] = None,
                  child_ner_eval_types: Optional[Dict[EvaluationMode, Set[EvaluationType]]] = None):
@@ -85,7 +84,7 @@ class Case:
         self.candidates = candidates
         self.predicted_by = predicted_by
         self.optional = true_entity.is_optional() if true_entity else False
-        self.error_labels = set() if error_labels is None else error_labels
+        self.error_labels = {m: set() for m in EvaluationMode} if error_labels is None else error_labels
         self.mention_type = get_mention_type(text, true_entity, predicted_entity)
         self.factor = 1 if factor is None else factor
         self.child_linking_eval_types = child_linking_eval_types
@@ -110,6 +109,7 @@ class Case:
             if self.child_linking_eval_types is None:
                 # Child evaluation types have not been initialized (yet) so the
                 # parent evaluation type can't be inferred
+                # This is always the case for 0-factor cases with a non-root GT label
                 return []
 
             # Get eval type of child cases with factor != 0.
@@ -122,19 +122,19 @@ class Case:
                 return [EvaluationType.TP]
             else:
                 # Don't return FP. FPs are counted for all cases with factor != 0 so there's
-                # no special treatment of the parent needed
-                # This case should never happen, since cases with factor = 0 are always caess
+                # no special treatment of the parent needed.
+                # This case should never happen, since cases with factor = 0 are always cases
                 # with a GT and therefore have at least one FN or TP.
-                logger.warning("Evaluation case with factor = 0 is neither FN nor TP.")
+                # Unless children are unknown and mode is IGNORED.
                 return []
 
         if not self.has_ground_truth():
             if self.has_prediction():
-                if eval_mode in (EvaluationMode.IGNORED, EvaluationMode.OPTIONAL) and not self.prediction_is_known():
-                    # --- / unk: IGN, OPT
+                if eval_mode == EvaluationMode.IGNORED and not self.prediction_is_known():
+                    # --- / unk: IGN
                     return []
                 # --- / unk: REQ
-                # --- / ent: IGN, OPT, REQ
+                # --- / ent: IGN, REQ
                 return [EvaluationType.FP]
             else:
                 # The case (not self.predicted_entity) should not happen
@@ -143,20 +143,15 @@ class Case:
 
         if not self.has_prediction():
             if self.is_optional():
-                if eval_mode in (EvaluationMode.IGNORED, EvaluationMode.OPTIONAL):
-                    # optent / ---: IGN, OPT
-                    # optunk / ---: IGN, OPT
-                    return []
-                else:
-                    # optent / ---: REQ
-                    # optunk / ---: REQ
-                    return [EvaluationType.FN]
+                # optent / ---: IGN, REQ
+                # optunk / ---: IGN, REQ
+                return []
             elif self.has_ground_truth():
-                if eval_mode in (EvaluationMode.IGNORED, EvaluationMode.OPTIONAL) and not self.ground_truth_is_known():
-                    # unk / ---: IGN, OPT
+                if eval_mode == EvaluationMode.IGNORED and not self.ground_truth_is_known():
+                    # unk / ---: IGN
                     return []
                 # unk / ---: REQ
-                # ent / ---: IGN, OPT, REQ
+                # ent / ---: IGN, REQ
                 return [EvaluationType.FN]
             else:
                 # The case (not self.true_entity) should not happen
@@ -165,61 +160,47 @@ class Case:
 
         if self.is_optional():
             if self.prediction_is_known():
-                if eval_mode == EvaluationMode.IGNORED:
-                    # optent / ent: IGN
-                    # optunk / ent: IGN
-                    return [EvaluationType.FP]
-                elif self.true_entity.entity_id == self.predicted_entity.entity_id or \
+                if (self.ground_truth_is_known() and self.true_entity.entity_id == self.predicted_entity.entity_id) or \
                         self.is_true_quantity_or_datetime():
-                    if eval_mode == EvaluationMode.OPTIONAL:
-                        # optent / ent: OPT (true)
-                        return []
-                    else:
-                        # optent / ent: REQ (true)
-                        return [EvaluationType.TP]
+                    # optent / ent: IGN, REQ (true)
+                    return []
                 else:
-                    # optent / ent: OPT, REQ (false)
-                    # optunk / ent: OPT, REQ
-                    return [EvaluationType.FN, EvaluationType.FP]
+                    # optent / ent: IGN, REQ (false)
+                    # optunk / ent: IGN, REQ
+                    return [EvaluationType.FP]
             else:
-                if self.ground_truth_is_known() or self.ground_truth_is_datetime_or_quantity():
-                    if eval_mode == EvaluationMode.IGNORED:
-                        # optent / unk: IGN
-                        return []
-                    else:
-                        # optent / unk: OPT, REQ
-                        return [EvaluationType.FN, EvaluationType.FP]
-                else:
-                    if eval_mode in (EvaluationMode.IGNORED, EvaluationMode.OPTIONAL):
-                        # optunk / unk: IGN, OPT
-                        return []
-                    else:
-                        # optunk / unk: REQ
-                        return [EvaluationType.TP]
+                if (self.ground_truth_is_known() or self.ground_truth_is_datetime_or_quantity()) and \
+                        eval_mode == EvaluationMode.REQUIRED:
+                    # optent / unk: REQ
+                    return [EvaluationType.FP]
+                # optent / unk: IGN
+                # optunk / unk: IGN
+                # optunk / unk: REQ
+                return []
         elif self.ground_truth_is_known():
             if self.prediction_is_known():
                 if self.true_entity.entity_id == self.predicted_entity.entity_id:
-                    # ent / ent: IGN, OPT, REQ (true)
+                    # ent / ent: IGN, REQ (true)
                     return [EvaluationType.TP]
                 else:
-                    # ent / ent: IGN, OPT, REQ (false)
+                    # ent / ent: IGN, REQ (false)
                     return [EvaluationType.FN, EvaluationType.FP]
             else:
                 if eval_mode == EvaluationMode.IGNORED:
                     # ent / unk: IGN
                     return [EvaluationType.FN]
-                # ent / unk: OPT, REQ
+                # ent / unk: REQ
                 return [EvaluationType.FN, EvaluationType.FP]
         else:
             if self.prediction_is_known():
                 if eval_mode == EvaluationMode.IGNORED:
                     # unk / ent: IGN
                     return [EvaluationType.FP]
-                # unk / ent: OPT, REQ
+                # unk / ent: REQ
                 return [EvaluationType.FN, EvaluationType.FP]
             else:
-                if eval_mode in (EvaluationMode.IGNORED, EvaluationMode.OPTIONAL):
-                    # unk / unk: IGN, OPT
+                if eval_mode == EvaluationMode.IGNORED:
+                    # unk / unk: IGN
                     return []
                 # unk / unk: REQ
                 return[EvaluationType.TP]
@@ -242,18 +223,18 @@ class Case:
             else:
                 # Don't return FP. FPs are counted for all cases with factor != 0 so there's
                 # no special treatment of the parent needed.
-                # This case should never happen, since cases with factor = 0 are always caess
+                # This case should never happen, since cases with factor = 0 are always cases
                 # with a GT and therefore have at least one FN or TP.
-                logger.warning("Evaluation case with factor = 0 is neither NER FN nor TP.")
+                # Unless children are unknown and mode is IGNORED.
                 return []
 
         if not self.has_ground_truth():
             if self.has_prediction():
-                if eval_mode in (EvaluationMode.IGNORED, EvaluationMode.OPTIONAL) and not self.prediction_is_known():
-                    # --- / unk: IGN, OPT
+                if eval_mode == EvaluationMode.IGNORED and not self.prediction_is_known():
+                    # --- / unk: IGN
                     return []
                 # --- / unk: REQ
-                # --- / ent: IGN, OPT, REQ
+                # --- / ent: IGN, REQ
                 return [EvaluationType.FP]
             else:
                 # The case (not self.predicted_entity) should not happen
@@ -262,20 +243,15 @@ class Case:
 
         if not self.has_prediction():
             if self.is_optional():
-                if eval_mode in (EvaluationMode.IGNORED, EvaluationMode.OPTIONAL):
-                    # optent / ---: IGN, OPT
-                    # optunk / ---: IGN, OPT
-                    return []
-                else:
-                    # optent / ---: REQ
-                    # optunk / ---: REQ
-                    return [EvaluationType.FN]
+                # optent / ---: IGN, REQ
+                # optunk / ---: IGN, REQ
+                return []
             elif self.has_ground_truth():
-                if eval_mode in (EvaluationMode.IGNORED, EvaluationMode.OPTIONAL) and not self.ground_truth_is_known():
-                    # unk / ---: IGN, OPT
+                if eval_mode == EvaluationMode.IGNORED and not self.ground_truth_is_known():
+                    # unk / ---: IGN
                     return []
                 # unk / ---: REQ
-                # ent / ---: IGN, OPT, REQ
+                # ent / ---: IGN, REQ
                 return [EvaluationType.FN]
             else:
                 # The case (not self.true_entity) should not happen
@@ -283,48 +259,35 @@ class Case:
                 return []
 
         if self.is_optional():
-            if self.prediction_is_known():
-                if eval_mode == EvaluationMode.IGNORED:
-                    # optent / ent: IGN
-                    # optunk / ent: IGN
-                    return [EvaluationType.FP]
-                elif eval_mode == EvaluationMode.OPTIONAL:
-                    # optent / ent: OPT
-                    # optunk / ent: OPT
-                    return []
-                else:
-                    # optent / ent: OPT, REQ
-                    # optunk / ent: OPT, REQ
-                    return [EvaluationType.TP]
-            else:
-                if eval_mode in (EvaluationMode.IGNORED, EvaluationMode.OPTIONAL):
-                    # optent / unk: IGN, OPT
-                    # optunk / unk: IGN, OPT
-                    return []
-                else:
-                    # optent / unk: REQ
-                    # optunk / unk: REQ
-                    return [EvaluationType.TP]
+            if not (self.ground_truth_is_known() or self.ground_truth_is_datetime_or_quantity()) and \
+                    self.prediction_is_known() and eval_mode == EvaluationMode.IGNORED:
+                # optunk / ent: IGN
+                return [EvaluationType.FP]
+            # optent / ent: IGN, REQ
+            # optent / unk: IGN, REQ
+            # optunk / ent: REQ
+            # optunk / unk: IGN, REQ
+            return []
         elif self.ground_truth_is_known():
             if self.prediction_is_known():
-                # ent / ent: IGN, OPT, REQ
+                # ent / ent: IGN, REQ
                 return [EvaluationType.TP]
             else:
                 if eval_mode == EvaluationMode.IGNORED:
                     # ent / unk: IGN
                     return [EvaluationType.FN]
-                # ent / unk: OPT, REQ
+                # ent / unk: REQ
                 return [EvaluationType.TP]
         else:
             if self.prediction_is_known():
                 if eval_mode == EvaluationMode.IGNORED:
                     # unk / ent: IGN
                     return [EvaluationType.FP]
-                # unk / ent: OPT, REQ
+                # unk / ent: REQ
                 return [EvaluationType.TP]
             else:
-                if eval_mode in (EvaluationMode.IGNORED, EvaluationMode.OPTIONAL):
-                    # unk / unk: IGN, OPT
+                if eval_mode == EvaluationMode.IGNORED:
+                    # unk / unk: IGN
                     return []
                 # unk / unk: REQ
                 return[EvaluationType.TP]
@@ -385,8 +348,8 @@ class Case:
     def is_coreference(self) -> bool:
         return self.mention_type.is_coreference()
 
-    def add_error_label(self, error_label: ErrorLabel):
-        self.error_labels.add(error_label)
+    def add_error_label(self, error_label: ErrorLabel, eval_mode: EvaluationMode):
+        self.error_labels[eval_mode].add(error_label)
 
     def __lt__(self, other) -> bool:
         return self.span < other.span
@@ -396,11 +359,12 @@ class Case:
                 "text": self.text,
                 "candidates": [{"entity_id": cand.entity_id, "name": cand.name} for cand in sorted(self.candidates)],
                 "predicted_by": self.predicted_by,
-                "error_labels": sorted([label.value for label in self.error_labels]),
+                "error_labels": {mode.value: sorted([label.value for label in self.error_labels[mode]])
+                                 for mode in EvaluationMode},
                 "factor": self.factor,
-                "linking_eval_types": {mode.value: [et.value for et in self.linking_eval_types[mode]]
+                "linking_eval_types": {mode.value: sorted([et.value for et in self.linking_eval_types[mode]])
                                        for mode in EvaluationMode},
-                "ner_eval_types": {mode.value: [et.value for et in self.ner_eval_types[mode]]
+                "ner_eval_types": {mode.value: sorted([et.value for et in self.ner_eval_types[mode]])
                                    for mode in EvaluationMode},
                 "optional": self.optional}
         if self.true_entity is not None:
@@ -412,10 +376,10 @@ class Case:
         if self.mention_type is not None:
             data["mention_type"] = self.mention_type.value
         if self.child_linking_eval_types is not None:
-            data["child_linking_eval_types"] = {m.value: [et.value for et in self.child_linking_eval_types[m]]
+            data["child_linking_eval_types"] = {m.value: sorted([et.value for et in self.child_linking_eval_types[m]])
                                                 for m in EvaluationMode}
         if self.child_ner_eval_types is not None:
-            data["child_ner_eval_types"] = {m.value: [et.value for et in self.child_ner_eval_types[m]]
+            data["child_ner_eval_types"] = {m.value: sorted([et.value for et in self.child_ner_eval_types[m]])
                                             for m in EvaluationMode}
         return data
 
@@ -438,13 +402,14 @@ def case_from_dict(data) -> Case:
     child_linking_eval_types = None
     if "child_linking_eval_types" in data:
         child_linking_eval_types = {EvaluationMode(m): set([EvaluationType(t)
-                                                            for t in data["child_linking_eval_types"]])
+                                                            for t in data["child_linking_eval_types"][m]])
                                     for m in data["child_linking_eval_types"]}
     child_ner_eval_types = None
     if "child_ner_eval_types" in data:
-        child_ner_eval_types = {EvaluationMode(m): set([EvaluationType(t) for t in data["child_ner_eval_types"]])
+        child_ner_eval_types = {EvaluationMode(m): set([EvaluationType(t) for t in data["child_ner_eval_types"][m]])
                                 for m in data["child_ner_eval_types"]}
-    error_labels = {ERROR_LABELS[label] for label in data["error_labels"]}
+    error_labels = {EvaluationMode(m): {ERROR_LABELS[label] for label in data["error_labels"][m]}
+                    for m in data["error_labels"]}
     return Case(span=data["span"],
                 text=data["text"],
                 true_entity=true_entity,

@@ -1,5 +1,6 @@
 {
-  "name": "Spacy",
-  "model_name": "prior_trained",
-  "kb": "wikidata"
+  "linker_name": "Spacy",
+  "model_name": "wikipedia",
+  "kb": "wikipedia",
+  "experiment_description": "Using a knowledge base and model derived from Wikipedia."
 }
