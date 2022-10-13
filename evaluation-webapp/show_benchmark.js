@@ -25,14 +25,13 @@ window.NO_LABEL_ENTITY_IDS = ["QUANTITY", "DATETIME", "Unknown"];
 
 window.IGNORE_HEADERS = ["true_positives", "false_positives", "false_negatives", "ground_truth"];
 window.PERCENTAGE_HEADERS = ["precision", "recall", "f1"];
-window.COPY_TABLE_CELL_TEXT = "Copy table";
 
 window.TABLE_FORMAT_LATEX = "LATEX";
 window.TABLE_FORMAT_TSV = "TSV";
 
 window.TOOLTIP_EXAMPLE_HTML = "<p><a href=\"#example_benchmark_modal\" onclick=\"show_example_benchmark_modal(this)\" data-toggle=\"modal\" data-target=\"#example_benchmark_modal\">For an example click here</a>.</p>";
 window.HEADER_DESCRIPTIONS = {
-    "undetected": {
+    "ner_fn": {
         "": "Errors involving undetected mentions.",
         "all": "<p><i>Numerator:</i> A ground truth mention span is not linked to an entity.</p><p><i>Denominator:</i> All ground truth entity mentions.</p>",
         "lowercased": "<p><i>Numerator:</i> Undetected lowercased ground truth mention.</p><p><i>Denominator:</i> All lowercased ground truth mentions.</p>",
@@ -40,7 +39,7 @@ window.HEADER_DESCRIPTIONS = {
         "partial_overlap": "<p><i>Numerator:</i> Undetected mention that overlaps with a predicted mention.</p><p><i>Denominator:</i> All ground truth mentions that are not lowercased.</p>",
         "other": "<p><i>Numerator:</i> Undetected mention that does not fall into any of the other categories.</p><p><i>Denominator:</i> All ground truth mentions that are not lowercased.</p>"
     },
-    "false_detection": {
+    "ner_fp": {
         "": "Errors involving false detections.",
         "all": "A mention is predicted whose span is not linked in the ground truth.",
         "lowercased": "The predicted mention is lowercased and does not overlap with a ground truth mention.",
@@ -128,12 +127,12 @@ window.HEADER_DESCRIPTIONS = {
 };
 
 window.ERROR_CATEGORY_MAPPING = {
-    "undetected": {
-        "all": ["UNDETECTED"],
-        "lowercased": ["UNDETECTED_LOWERCASED"],
-        "partially_included": ["UNDETECTED_PARTIALLY_INCLUDED"],
-        "partial_overlap": ["UNDETECTED_PARTIAL_OVERLAP"],
-        "other": ["UNDETECTED_OTHER"]
+    "ner_fn": {
+        "all": ["NER_FN"],
+        "lowercased": ["NER_FN_LOWERCASED"],
+        "partially_included": ["NER_FN_PARTIALLY_INCLUDED"],
+        "partial_overlap": ["NER_FN_PARTIAL_OVERLAP"],
+        "other": ["NER_FN_OTHER"]
     },
     "wrong_disambiguation": {
         "all": ["DISAMBIGUATION_WRONG"],
@@ -145,12 +144,12 @@ window.ERROR_CATEGORY_MAPPING = {
         "wrong_candidates": ["DISAMBIGUATION_WRONG_CANDIDATES"],
         "multiple_candidates": ["DISAMBIGUATION_MULTI_CANDIDATES_WRONG"]
     },
-    "false_detection": {
-        "all": ["FALSE_DETECTION"],
-        "lowercased": ["FALSE_DETECTION_LOWERCASED"],
-        "groundtruth_unknown": ["FALSE_DETECTION_GROUNDTRUTH_UNKNOWN"],
-        "other": ["FALSE_DETECTION_OTHER"],
-        "wrong_span": ["FALSE_DETECTION_WRONG_SPAN"]
+    "ner_fp": {
+        "all": ["NER_FP"],
+        "lowercased": ["NER_FP_LOWERCASED"],
+        "groundtruth_unknown": ["NER_FP_GROUNDTRUTH_UNKNOWN"],
+        "other": ["NER_FP_OTHER"],
+        "wrong_span": ["NER_FP_WRONG_SPAN"]
     },
     "other_errors": {
         "hyperlink": ["HYPERLINK_WRONG"]
@@ -186,9 +185,9 @@ window.EVALUATION_CATEGORY_TITLES = {
         "coref_nominal": {"checkbox_label": "Coref: Nominal", "table_heading": "Coref: Nominal"},
     },
     "error_categories": {
-        "NER": {"checkbox_label": "NER: All", "table_heading": "NER: All"},
-        "undetected": {"checkbox_label": "NER: False Negatives", "table_heading": "NER: False Negatives"},
-        "false_detection": {"checkbox_label": "NER: False Positives", "table_heading": "NER: False Positives"},
+        "ner": {"checkbox_label": "NER", "table_heading": "NER"},
+        "ner_fn": {"checkbox_label": "NER: False Negatives", "table_heading": "NER: False Negatives"},
+        "ner_fp": {"checkbox_label": "NER: False Positives", "table_heading": "NER: False Positives"},
         "wrong_disambiguation": {"checkbox_label": "Disambiguation Errors", "table_heading": "Disambiguation Errors"},
         "other_errors": {"checkbox_label": "Other Errors", "table_heading": "Other Errors"},
         "wrong_coreference": {"checkbox_label": "Coreference Errors", "table_heading": "Coreference Errors"},
@@ -419,6 +418,13 @@ $("document").ready(function() {
             }
         }
     });
+
+    $('#graph_modal').on('hidden.bs.modal', function () {
+        // Destroy the current graph when the modal is closed.
+        // This is necessary to prevent the graph from switching to a previous version due
+        // to hover effects.
+        Chart.getChart('graph_canvas').destroy();
+    });
 });
 
 
@@ -576,7 +582,7 @@ function read_benchmark_articles() {
                     filename = filename + ".obscured";
                 }
                 return $.get("benchmarks/" + filename, function(data) {
-                    let benchmark = filename.replace(BENCHMARK_EXTENSION, "");
+                    let benchmark = filename.replace(BENCHMARK_EXTENSION, "").replace(".obscured", "");
                     window.benchmark_articles[benchmark] = [];
                     for (let line of data.split("\n")) {
                         if (line.length > 0) window.benchmark_articles[benchmark].push(JSON.parse(line));
@@ -857,7 +863,7 @@ function add_evaluation_table_header(json_obj) {
     /*
      * Add html for the table header.
      */
-    let first_row = "<tr><th colspan=2 onclick=$('#copy_table_modal').modal('show') class='copy_table'>" + COPY_TABLE_CELL_TEXT + "</th>";
+    let first_row = "<tr><th colspan=2></th>";
     let second_row = "<tr><th>Experiment</th><th>Benchmark</th>";
     $.each(json_obj, function(key) {
         $.each(json_obj[key], function(subkey) {
@@ -867,11 +873,11 @@ function add_evaluation_table_header(json_obj) {
                 if (!(IGNORE_HEADERS.includes(subsubkey))) {
                     let subclass_name = get_class_name(subsubkey);
                     let sort_order = (subkey in ERROR_CATEGORY_MAPPING) ? " data-sortinitialorder=\"asc\"" : "";
-                    second_row += "<th class='" + class_name + " " + class_name + "-" + subclass_name + " sorter-digit'" + sort_order + ">" + get_table_heading(subkey, subsubkey) + "</th>";
+                    second_row += "<th class='" + class_name + " " + class_name + "-" + subclass_name + " sorter-digit'" + sort_order + ">" + get_checkbox_or_column_title(subkey, subsubkey, false) + "</th>";
                     colspan += 1;
                 }
             });
-            first_row += "<th colspan=\"" + colspan + "\" class='" + class_name + "'>" + get_table_heading(key, subkey) + "</th>";
+            first_row += "<th colspan=\"" + colspan + "\" class='" + class_name + "'>" + get_checkbox_or_column_title(key, subkey, false) + "</th>";
         });
     });
     first_row += "</tr>";
@@ -892,21 +898,6 @@ function add_evaluation_table_header(json_obj) {
             });
         }
     });
-}
-
-function get_table_heading(key, subkey) {
-    /*
-     * Get the text for the table header cell that is defined via its evaluation results key and subkey.
-     */
-    const lower_key = key.toLowerCase();
-    const lower_subkey = subkey.toLowerCase();
-    if (key === "entity_types" && subkey in window.whitelist_types) {
-        return "Type: " + window.whitelist_types[subkey];
-    } else if (lower_key in EVALUATION_CATEGORY_TITLES && lower_subkey in EVALUATION_CATEGORY_TITLES[lower_key]) {
-        return EVALUATION_CATEGORY_TITLES[lower_key][lower_subkey]["table_heading"];
-    } else {
-        return to_title_case(subkey.replace(/_/g, " "));
-    }
 }
 
 function add_evaluation_table_body(result_list) {
@@ -1118,14 +1109,11 @@ function on_row_click(el) {
     let previous_benchmark = (window.selected_experiment_ids.length >= 1) ? get_benchmark_from_experiment_id(window.selected_experiment_ids[0]) : null;
     let new_benchmark = get_benchmark_from_experiment_id(experiment_id);
 
-    let $evaluation_table_rows = $("#evaluation_table_wrapper table tbody tr");
-
     // De-select previously selected rows
     if (!is_compare_checked() || window.selected_experiment_ids.length >= MAX_SELECTED_APPROACHES) {
         $("#evaluation_table_wrapper tbody tr").removeClass("selected");
         window.selected_rows = [];
         window.selected_experiment_ids = [];
-        $evaluation_table_rows.removeClass("sibling_selected");
     }
 
     // Show alert message if the user tries to compare experiments on different benchmarks
@@ -1146,18 +1134,6 @@ function on_row_click(el) {
         window.selected_rows.push(el);
     }
     let selected_exp_ids_copy = [...window.selected_experiment_ids];
-
-    // Highlight table rows with experiments of the same name if grouped by benchmark
-    if (!is_compare_checked()) $evaluation_table_rows.removeClass("sibling_selected");
-    if (get_group_by() === "benchmark") {
-        // Get all rows whose experiment column has the same text
-        let experiment_name = $(el).find("td:nth-child(1)").text();
-        $evaluation_table_rows.each(function() {
-            if (this !== el && $(this).find("td:nth-child(1)").text().toLowerCase() === experiment_name.toLowerCase()) {
-                $(this).addClass("sibling_selected");
-            }
-        });
-    }
 
     // Update current URL without refreshing the site
     const url = new URL(window.location);
@@ -1432,7 +1408,7 @@ function add_evaluation_checkboxes(json_obj) {
     $.each(json_obj, function(key) {
         $.each(json_obj[key], function(subkey) {
             const class_name = get_class_name(subkey);
-            const label = get_checkbox_label(key, subkey);
+            const label = get_checkbox_or_column_title(key, subkey, true);
             const checked = ((class_name === "all" && window.url_param_show_columns.length === 0) || window.url_param_show_columns.includes(class_name)) ? "checked" : "";
             let checkbox_html = "<span id=\"checkbox_span_" + class_name + "\"><input type=\"checkbox\" id=\"checkbox_" + class_name + "\" onchange=\"on_column_checkbox_change(this, true)\" " + checked + ">";
             checkbox_html += "<label for='checkbox_" + class_name + "'>" + label + "</label></span>\n";
@@ -1450,21 +1426,6 @@ function add_evaluation_checkboxes(json_obj) {
             });
         });
     });
-}
-
-function get_checkbox_label(key, subkey) {
-    /*
-     * Get the label for the checkbox specified via the given evaluation results key and subkey.
-     */
-    const lower_key = key.toLowerCase();
-    const lower_subkey = subkey.toLowerCase();
-    if (key === "entity_types" && subkey in window.whitelist_types) {
-        return window.whitelist_types[subkey];
-    } else if (lower_key in EVALUATION_CATEGORY_TITLES && lower_subkey in EVALUATION_CATEGORY_TITLES[lower_key]) {
-        return EVALUATION_CATEGORY_TITLES[lower_key][lower_subkey]["checkbox_label"];
-    } else {
-        return to_title_case(subkey.replace(/_/g, " "));
-    }
 }
 
 function on_column_checkbox_change(element, resize) {
@@ -2275,25 +2236,19 @@ function get_emphasis_string(selected_cell_category) {
     /*
      * Create an emphasis string for the given selected category.
      */
-    let emphasis = "all";
-    let emphasis_type = "mention type";
-    const mention_types = $.map( MENTION_TYPE_HEADERS, function(key){ return MENTION_TYPE_HEADERS[key]; });
+    let emphasis = "All";
     if (selected_cell_category) {
         let emphasis_strs = [];
         for (const selected_category of selected_cell_category) {
             if (is_type_string(selected_category)) {
-                 emphasis_strs.push(get_type_label(selected_category));
-                 emphasis_type = "entity type";
-            } else if (mention_types.includes(selected_category)) {
-                emphasis_strs.push(selected_category.replace(/_/g, " ").toLowerCase());
+                emphasis_strs.push("Entity Type: " + get_type_label(selected_category));
             } else {
-                emphasis_strs.push(selected_category.replace(/_/g, " ").toLowerCase());
-                emphasis_type = "error category";
+                emphasis_strs.push(to_title_case(selected_category.toLowerCase().replace(/_/g, " ")));
             }
         }
         emphasis = emphasis_strs.join(", ");
     }
-    return " (emphasis: " + emphasis_type + " \"" + emphasis + "\")";
+    return " (emphasis: \"" + emphasis + "\")";
 }
 
 
@@ -2495,6 +2450,10 @@ function scroll_to_annotation(annotation) {
  Functions for COPYING TABLE
  *********************************************************************************************************************/
 
+function show_copy_table_modal() {
+    $('#copy_table_modal').modal('show');
+}
+
 function copy_table() {
     /*
      * Copy the evaluation results table to clipboard.
@@ -2504,6 +2463,37 @@ function copy_table() {
     const include_experiment = $("#checkbox_include_experiment").is(":checked");
     const include_benchmark = $("#checkbox_include_benchmark").is(":checked");
 
+    // Get the table header contents and count columns
+    const table_contents = get_table_contents(include_benchmark, include_experiment);
+    const num_cols = table_contents[1].length;
+
+    // Get table text in the specified format
+    let table_text;
+    if (format === TABLE_FORMAT_LATEX) {
+        table_text = produce_latex(table_contents, num_cols, include_experiment, include_benchmark);
+    } else {
+        table_text = produce_tsv(table_contents);
+    }
+
+    // Copy the table text to the clipboard
+    const $copy_table_text_div = $("#evaluation_overview .copy_table_text");
+    const $copy_table_textarea = $("#evaluation_overview .copy_table_text textarea");
+    $copy_table_text_div.show();
+    $copy_table_textarea.val(table_text);
+    $copy_table_textarea.show();  // Text is not selected or copied if it is hidden
+    $copy_table_textarea.select();
+    document.execCommand("copy");
+    $copy_table_textarea.hide();
+
+    // Show the notification for the specified number of seconds
+    const show_duration_seconds = 5;
+    setTimeout(function() { $copy_table_text_div.hide(); }, show_duration_seconds * 1000);
+}
+
+function get_table_contents(include_benchmark, include_experiment) {
+    /*
+     * Get the contents of the currently displayed table in an array.
+     */
     // Get the table header contents and count columns
     let num_cols = 0;
     let table_contents = [];
@@ -2525,8 +2515,7 @@ function copy_table() {
                 colspan = (colspan) ? colspan : 1;
                 // Copy-Latex-cell should not have a header and colspan depends on whether to include
                 // the experiment and benchmark columns
-                if (title === COPY_TABLE_CELL_TEXT) {
-                    title = "";
+                if (title === "") {
                     colspan = include_benchmark + include_experiment;
                     if (colspan === 0) return;
                 }
@@ -2565,28 +2554,7 @@ function copy_table() {
             if (table_row_contents) table_contents.push(table_row_contents);
         }
     });
-
-    // Get table text in the specified format
-    let table_text;
-    if (format === TABLE_FORMAT_LATEX) {
-        table_text = produce_latex(table_contents, num_cols, include_experiment, include_benchmark);
-    } else {
-        table_text = produce_tsv(table_contents);
-    }
-
-    // Copy the table text to the clipboard
-    const $copy_table_text_div = $("#evaluation_overview .copy_table_text");
-    const $copy_table_textarea = $("#evaluation_overview .copy_table_text textarea");
-    $copy_table_text_div.show();
-    $copy_table_textarea.val(table_text);
-    $copy_table_textarea.show();  // Text is not selected or copied if it is hidden
-    $copy_table_textarea.select();
-    document.execCommand("copy");
-    $copy_table_textarea.hide();
-
-    // Show the notification for the specified number of seconds
-    const show_duration_seconds = 5;
-    setTimeout(function() { $copy_table_text_div.hide(); }, show_duration_seconds * 1000);
+    return table_contents;
 }
 
 function produce_latex(table_contents, n_cols, include_experiment, include_benchmark) {
@@ -2646,6 +2614,278 @@ function produce_tsv(table_contents) {
         tsv_string += "\n";
     }
     return tsv_string;
+}
+
+/**********************************************************************************************************************
+ Functions for CREATING GRAPHS
+ *********************************************************************************************************************/
+
+function show_graph(el) {
+    /*
+     * Create a graph for the current table and display it in a modal.
+     */
+    // Remove the overlay and the fake table header
+    graph_mode_off();
+    // Create the graph for the selected column
+    const col_index = $($(el).parent().children(":not([style*=\"display: none\"])")).index(el);
+    create_graph(col_index);
+    // Get graph title
+    let graph_title = get_full_category_title_for_column(el);
+    $('#graph_modal .modal-title').html("<b>" + graph_title + "</b>");
+    // Display the graph modal
+    $('#graph_modal').modal('show');
+}
+
+function graph_mode_on() {
+    /*
+     * Enter the graph mode. Add an overlay to the webapp and guide the user towards selecting
+     * a table column.
+     */
+    const $evaluation_table_wrapper = $("#evaluation_table_wrapper");
+
+    $("#overlay").show();
+    $("#overlay_footer").show();
+
+    // Scroll to the table header
+    $([document.documentElement, document.body]).animate({
+        scrollTop: $evaluation_table_wrapper.offset().top - 40
+    }, 400);
+
+    // Clone the sticky table header and adjust it
+    const $table_header_clone = $("#evaluation_table_wrapper .tablesorter-sticky-wrapper").clone();
+    $table_header_clone.attr("id", "table_header_clone");
+    $table_header_clone.attr("class", "");
+    $table_header_clone.css({"z-index": 101, "visibility": "visible"});
+    $evaluation_table_wrapper.append($table_header_clone);
+
+    // Disable scrolling, otherwise the clone can be scrolled out of view
+    $evaluation_table_wrapper.css({"overflow-y": "hidden"});
+
+    // Add appropriate classes to selectable columns
+    const $selectable_th = $table_header_clone.find("table tr:nth-child(2) th:not(:eq(0),:eq(1))");
+    $selectable_th.addClass("graph_selectable_col");
+    $selectable_th.on("mouseenter", function() { $(this).addClass("graph_selectable_col-hovered"); });
+    $selectable_th.on("mouseleave", function() { $(this).removeClass("graph_selectable_col-hovered"); });
+
+    // Trigger open graph modal on click
+    $selectable_th.on("click", function() { show_graph(this); })
+}
+
+function graph_mode_off() {
+    /*
+     * Terminate the graph mode. Hide the overlay and remove the fake table header.
+     */
+    $("#overlay").hide();
+    $("#overlay_footer").hide();
+    $("#table_header_clone").remove();
+    $("#evaluation_table_wrapper").css({"overflow-y": "auto"});
+}
+
+function create_graph(y_column) {
+    /*
+     * Create a graph from the currently displayed table with values from the given table column.
+     */
+    const $warning_paragraph = $("#graph_modal .warning");
+    const $canvas = $("#graph_canvas");
+    const $download_button = $("#download_graph");
+    const $download_tsv_button = $("#download_graph_tsv");
+
+    // Reset the modal components
+    $canvas.show();
+    $warning_paragraph.hide();
+    $download_button.prop("disabled",false);
+    $download_tsv_button.prop("disabled",false);
+
+    let colors = ["gold", "crimson", "royalblue", "orange", "yellowgreen", "purple", "teal", "fuchsia", "turquoise", "indigo"];
+    if ("graph_colors" in config) colors = config["graph_colors"];
+
+    let x_column = 1;
+    let line_column = 0;
+    let table_contents = get_table_contents(true, true)
+
+    // Get the unique x-values
+    let x_values = $.map(table_contents, function(el) {
+        // Don't add header cell values
+        if (!el[x_column][2]) return el[x_column][0];
+    });
+    x_values = x_values.filter(is_unique);
+
+    // Get unique labels for the individual lines of the graph
+    let line_labels = $.map(table_contents, function(el) {
+        if (!el[line_column][2]) return el[line_column][0];
+    });
+    line_labels = line_labels.filter(is_unique);
+
+    // Show a warning instead of the canvas if more lines are to be drawn than colors exist.
+    // This is mostly to prevent the legend from overlapping with the graph and the graph looking all weird.
+    if (line_labels.length > colors.length) {
+        $warning_paragraph.show();
+        $canvas.hide();
+        $download_button.prop("disabled",true);
+        $download_tsv_button.prop("disabled",true);
+        $warning_paragraph.html("<b>Too many distinct " + table_contents[1][line_column][0] + "s . Adjust your table by filtering out rows.</b>");
+        return;
+    }
+
+    // Get the y-values and other properties for each line of the graph
+    let datasets = []
+    line_labels.forEach(function(val, i) {
+        let dict = {};
+        dict["borderColor"] = colors[i];
+        dict["pointBackgroundColor"] = colors[i];
+        dict["pointBorderWidth"] = 4;
+        dict["borderWidth"] = 4;
+        dict["fill"] = false;
+        dict["lineTension"] = 0;
+        dict["label"] = val;
+        let x_index = 0;
+        // Get y-values
+        let y_values = [];
+        for (let row of table_contents) {
+            if (!row[line_column][2] && row[line_column][0] === val) {
+                // Fill up y_values with zeros if a line_label (e.g. experiment) does not exist
+                // for an y_value (e.g. benchmark)
+                while (row[x_column][0] !== x_values[x_index] && x_index < x_values.length) {
+                    y_values.push(0);
+                    x_index++;
+                }
+                if (x_index >= x_values.length) break;
+                y_values.push(parseFloat(row[y_column][0]));
+                x_index++;
+                if (x_index >= x_values.length) break;
+            }
+        }
+        while (y_values.length < x_values.length) {
+            y_values.push(0);
+        }
+        dict["data"] = y_values;
+        datasets.push(dict);
+    });
+
+    // Set the default font size for labels within the graph. This can still be changed
+    // for individual items such as the legend or specific scales, see
+    // https://www.chartjs.org/docs/latest/general/fonts.html
+    if ("graph_font_size" in window.config) Chart.defaults.font.size = window.config["graph_font_size"];
+
+    const y_axis_label = (table_contents[2][y_column][0].includes("%")) ? "in %" : "";
+    new Chart("graph_canvas", {
+        type: "line",
+        data: {
+            labels: x_values,
+            datasets
+        },
+        options: {
+            plugins: {
+                legend: {
+                    display: true,
+                    labels: {
+                        boxWidth: 10,
+                        generateLabels: function(chart) {
+                            let labels = Chart.defaults.plugins.legend.labels.generateLabels(chart);
+                            for (let key in labels) {
+                                labels[key].fillStyle  = labels[key].strokeStyle;
+                            }
+                            return labels;
+                        }
+                    }
+                }
+            },
+            animation: {
+                duration: 500
+            },
+            scales: {
+                x: {
+                    ticks: {
+                        autoSkip: false
+                    },
+                    grid: {
+                        display: false,
+                        drawBorder: false,
+                        drawOnChartArea: false,
+                        drawTicks: true,
+                    }
+                },
+                y: {
+                    title: {
+                        display: true,
+                        text: y_axis_label
+                    }
+                }
+            }
+        }
+    });
+}
+
+function download_graph_image() {
+    /*
+     * Download the currently displayed graph as PNG.
+     */
+    const a = document.createElement('a');
+    // Add a background for the chart, otherwise it's transparent when downloaded
+    add_canvas_background()
+    a.href = Chart.getChart('graph_canvas').toBase64Image();
+    let suffix = $('#graph_modal .modal-title').text();
+    suffix = suffix.toLowerCase().replace(/[^A-Za-z0-9]/g, "_").replace(/_+/g, "_");
+    a.download = "elevant_graph_" + suffix + ".png";
+    // Trigger the download
+    a.click();
+}
+
+function download_graph_tsv() {
+    /*
+     * Download the currently displayed graph data as TSV file.
+     */
+    const chart = Chart.getChart('graph_canvas');
+    let tsv = "";
+
+    // Create the header row
+    const x_labels = chart.data.labels;
+    for (let x_label of x_labels) {
+        // This works because first column is empty
+        tsv += "\t" + x_label;
+    }
+    tsv += "\n";
+
+    // Create the remaining rows
+    const datasets = chart.data.datasets;
+    for (let ds of datasets) {
+        let y_label = ds.label;
+        tsv += y_label + "\t";
+        for (let i in ds.data) {
+            tsv += ds.data[i];
+            if (i < ds.data.length - 1) tsv += "\t";
+        }
+        tsv += "\n";
+    }
+
+    // Download the TSV
+    const a = document.createElement('a');
+    a.href = 'data:text/plain;charset=utf-8,' + encodeURIComponent(tsv);
+    let suffix = $('#graph_modal .modal-title').text();
+    suffix = suffix.toLowerCase().replace(/[^A-Za-z0-9]/g, "_").replace(/_+/g, "_");
+    a.download = "elevant_graph_" + suffix + ".tsv";
+    a.click();
+}
+
+function add_canvas_background() {
+    /*
+     * Add a background to the canvas, so the background of the graph is not transparent when downloaded.
+     * See https://stackoverflow.com/questions/50104437/set-background-color-to-save-canvas-chart
+     */
+    // Get the 2D drawing context from the provided canvas.
+    const canvas = document.getElementById('graph_canvas');
+    const context = canvas.getContext('2d');
+
+    // We're going to modify the context state, so it's good practice to save the current state first.
+    context.save();
+    context.globalCompositeOperation = 'destination-over';
+
+    // Fill in the background. We do this by drawing a rectangle filling the entire canvas with white.
+    context.fillStyle = "white";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Restore the original context state from `context.save()`
+    context.restore();
 }
 
 /**********************************************************************************************************************
@@ -2790,6 +3030,8 @@ function get_type_label(qid) {
     const qid_upper = qid.replace("q", "Q");
     if (qid_upper in window.whitelist_types) {
         return window.whitelist_types[qid_upper];
+    } else if (qid.toLowerCase() === "other") {
+        return "Other";
     }
     return qid_upper + " (label missing)";
 }
@@ -2804,6 +3046,50 @@ function to_title_case(str) {
     return str.replace(/\w\S*/g, function(txt) {
         return txt.charAt(0).toUpperCase() + txt.substring(1);
     });
+}
+
+function get_checkbox_or_column_title(key, subkey, is_checkbox) {
+    /*
+     * Get the text for the table header cell that is defined via its evaluation results key and subkey.
+     */
+    const lower_key = key.toLowerCase();
+    const lower_subkey = subkey.toLowerCase();
+    if (key === "entity_types" && is_type_string(lower_subkey)) {
+        return (is_checkbox) ? get_type_label(lower_subkey) : "Type: " + get_type_label(lower_subkey);
+    } else if (lower_key in EVALUATION_CATEGORY_TITLES && lower_subkey in EVALUATION_CATEGORY_TITLES[lower_key]) {
+        const last_key = (is_checkbox) ? "checkbox_label" : "table_heading";
+        return EVALUATION_CATEGORY_TITLES[lower_key][lower_subkey][last_key];
+    } else {
+        return to_title_case(subkey.replace(/_/g, " "));
+    }
+}
+
+function get_full_category_title_for_column(el) {
+    /*
+     * For a given table cell (not from the first table header row) get the
+     * full category title, e.g. "NER: Precision" or "NER FP: Lowercased"
+     */
+    const keys = get_table_header_keys(el);
+    return get_full_category_title_for_keys(keys[0], keys[1]);
+}
+
+function get_full_category_title_for_keys(key, subkey) {
+    /*
+     * For a given key and subkey of a table cell (not from the first table header row) get the
+     * full category title, e.g. "NER: Precision" or "NER FP: Lowercased"
+     */
+    let title = "";
+    if (key in window.EVALUATION_CATEGORY_TITLES["mention_types"]) {
+        title += window.EVALUATION_CATEGORY_TITLES["mention_types"][key]["table_heading"];
+    } else if (key in window.EVALUATION_CATEGORY_TITLES["error_categories"]) {
+        title += window.EVALUATION_CATEGORY_TITLES["error_categories"][key]["table_heading"];
+    } else if (is_type_string(key)) {
+        title += "Type: " + get_type_label(key);
+    } else {
+        title += to_title_case(key.replace(/_/g, " "));
+    }
+    title += " - " + to_title_case(subkey.replace(/_/g, " "));
+    return title;
 }
 
 function remove_selected_classes(el) {
@@ -2881,4 +3167,12 @@ function get_displayed_benchmark_name(exp_id) {
     let benchmark = get_benchmark_from_experiment_id(exp_id);
     let metadata_benchmark_name = (benchmark in window.benchmarks_metadata) ? window.benchmarks_metadata[benchmark].name : null;
     return (metadata_benchmark_name) ? metadata_benchmark_name : benchmark;
+}
+
+function is_unique(value, index, self) {
+    /*
+     * Function to use with filter() to get only unique values in an array.
+     * See: https://stackoverflow.com/questions/1960473/get-all-unique-values-in-a-javascript-array-remove-duplicates
+     */
+    return self.indexOf(value) === index;
 }
