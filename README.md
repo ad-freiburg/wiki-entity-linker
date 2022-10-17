@@ -146,10 +146,10 @@ The linking results will be written to
  `_`.
 For example
 
-    python3 link_benchmark_entities.py ltl.popular_entities.entity_coref -l popular_entities -b wiki-ex -ll link-text-linker -coref entity
+    python3 link_benchmark_entities.py ltl.popular-entities.entity-coref -l popular-entities -b wiki-ex -ll link-text-linker -coref entity
 
 will create the file
- `evaluation-results/popular_entities/ltl.popular_entities.entity_coref.wiki-ex.linked_articles.jsonl`. The result
+ `evaluation-results/popular-entities/ltl.popular-entities.entity-coref.wiki-ex.linked_articles.jsonl`. The result
  file contains one article as JSON object per line. Each JSON object contains benchmark article information such as
  the article title, text, and ground truth labels, as well as the entity mentions produced by the specified linker.
 
@@ -169,10 +169,10 @@ To evaluate a linker's predictions use the script `evaluate_linking_results.py`:
 This will print precision, recall and F1 scores and create two new files where the `linked_articles.jsonl` file
  extension is replaced by `.eval_cases.jsonl` and `.eval_results.json` respectively. For example
 
-    python3 evaluate_linking_results.py evaluation-results/popular_entities/ltl.popular_entities.entity_coref.wiki-ex.linked_articles.jsonl
+    python3 evaluate_linking_results.py evaluation-results/popular-entities/ltl.popular-entities.entity-coref.wiki-ex.linked_articles.jsonl
 
-will create the files `evaluation-results/popular_entities/ltl.popular_entities.entity_coref.wiki-ex.eval_cases.jsonl` 
- and `evaluation-results/popular_entities/ltl.popular_entities.entity_coref.wiki-ex.eval_results.json`. The 
+will create the files `evaluation-results/popular-entities/ltl.popular-entities.entity-coref.wiki-ex.eval_cases.jsonl`
+ and `evaluation-results/popular-entities/ltl.popular-entities.entity-coref.wiki-ex.eval_results.json`. The
  `eval_cases` file contains information about each true positive, false positive and false negative case. The
  `eval_results` file contains the scores that are shown in the web app's evaluation results table.
 
