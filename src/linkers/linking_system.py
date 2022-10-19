@@ -116,7 +116,7 @@ class LinkingSystem:
         elif linker_type == PredictionFormats.WEXEA.value:
             self.load_missing_mappings({MappingName.WIKIPEDIA_WIKIDATA,
                                         MappingName.REDIRECTS})
-            self.prediction_iterator = WexeaPredictionReader(prediction_file, self.entity_db)
+            self.prediction_reader = WexeaPredictionReader(prediction_file, self.entity_db)
         elif linker_type == PredictionFormats.SIMPLE_JSONL.value:
             self.load_missing_mappings({MappingName.WIKIPEDIA_WIKIDATA,
                                         MappingName.REDIRECTS})
