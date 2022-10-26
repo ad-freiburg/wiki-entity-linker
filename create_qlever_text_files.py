@@ -5,7 +5,7 @@ import sys
 import spacy
 from spacy.tokens.doc import Doc
 
-from src.models.wikipedia_article import article_from_json
+from src.models.article import article_from_json
 
 
 def set_custom_sentence_boundaries(doc: Doc):
