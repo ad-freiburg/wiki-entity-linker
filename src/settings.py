@@ -35,16 +35,12 @@ NEWSCRAWL_TEST_ARTICLES = DATA_DIRECTORY + "articles/newscrawl/test.jsonl"
 
 # Wikidata mappings
 QID_TO_ABSTRACTS_FILE = DATA_DIRECTORY + "wikipedia_mappings/qid_to_wikipedia_abstract.tsv"
-QID_TO_ALIASES_FILE = DATA_DIRECTORY + "wikidata_mappings/qid_to_aliases.tsv"
-QID_TO_WIKIPEDIA_URL_FILE = DATA_DIRECTORY + "wikidata_mappings/qid_to_wikipedia_url.tsv"
 QID_TO_GENDER_FILE = DATA_DIRECTORY + "wikidata_mappings/qid_to_gender.tsv"
-QID_TO_NAME_FILE = DATA_DIRECTORY + "wikidata_mappings/qid_to_name.tsv"
-QID_TO_SITELINK_FILE = DATA_DIRECTORY + "wikidata_mappings/qid_to_sitelink.tsv"
+QID_TO_HUMAN_NAME_FILE = DATA_DIRECTORY + "wikidata_mappings/qid_to_name.tsv"
 QID_TO_DEMONYM_FILE = DATA_DIRECTORY + "wikidata_mappings/qid_to_demonym.tsv"
 QID_TO_LANGUAGE_FILE = DATA_DIRECTORY + "wikidata_mappings/qid_to_language.tsv"
 QID_TO_INSTANCE_OF_FILE = DATA_DIRECTORY + "wikidata_mappings/qid_to_p31.tsv"
 QID_TO_SUBCLASS_OF_FILE = DATA_DIRECTORY + "wikidata_mappings/qid_to_p279.tsv"
-QID_TO_LABEL_FILE = DATA_DIRECTORY + "wikidata_mappings/qid_to_label.tsv"
 QUANTITY_FILE = DATA_DIRECTORY + "wikidata_mappings/quantity.tsv"
 DATETIME_FILE = DATA_DIRECTORY + "wikidata_mappings/datetime.tsv"
 # Files to generate a mapping from QID to all its relevant types needed for our coref resolver
@@ -54,17 +50,29 @@ QID_TO_COREF_TYPES_FILE = DATA_DIRECTORY + "wikidata_mappings/qid_to_coreference
 # Wikidata types files
 WHITELIST_FILE = "small-data-files/whitelist_types.tsv"
 WHITELIST_TYPE_ADJUSTMENTS_FILE = "small-data-files/type_adjustments.txt"
-WHITELIST_TYPE_MAPPING = DATA_DIRECTORY + "wikidata_mappings/entity-types.tsv"
-
 
 # Wikipedia mappings
 LINK_FREEQUENCIES_FILE = DATA_DIRECTORY + "wikipedia_mappings/link_frequencies.pkl"
-REDIRECTS_FILE = DATA_DIRECTORY + "wikipedia_mappings/link_redirects.pkl"
+REDIRECTS_FILE = DATA_DIRECTORY + "wikipedia_mappings/redirects.pkl"
 TITLE_SYNONYMS_FILE = DATA_DIRECTORY + "wikipedia_mappings/title_synonyms.pkl"
 AKRONYMS_FILE = DATA_DIRECTORY + "wikipedia_mappings/akronyms.pkl"
 WIKIPEDIA_ID_TO_TITLE_FILE = DATA_DIRECTORY + "wikipedia_mappings/wikipedia_id_to_title.tsv"
 UNIGRAMS_FILE = DATA_DIRECTORY + "wikipedia_mappings/unigrams.txt"
-WIKIPEDIA_ABSTRACTS_FILE = DATA_DIRECTORY + "wikipedia_mappings/article_abstracts.tsv"
+
+# Database files
+QID_TO_SITELINKS_DB = DATA_DIRECTORY + "wikidata_mappings/qid_to_sitelinks.db"
+QID_TO_LABEL_DB = DATA_DIRECTORY + "wikidata_mappings/qid_to_label.db"
+LABEL_TO_QIDS_DB = DATA_DIRECTORY + "wikidata_mappings/label_to_qids.db"
+QID_TO_WHITELIST_TYPES_DB = DATA_DIRECTORY + "wikidata_mappings/qid_to_whitelist_types.db"
+QID_TO_ALIASES_DB = DATA_DIRECTORY + "wikidata_mappings/qid_to_aliases.db"
+ALIAS_TO_QIDS_DB = DATA_DIRECTORY + "wikidata_mappings/alias_to_qids.db"
+WIKIPEDIA_NAME_TO_QID_DB = DATA_DIRECTORY + "wikidata_mappings/wikipedia_name_to_qid.db"
+REDIRECTS_DB = DATA_DIRECTORY + "wikipedia_mappings/redirects.db"
+
+# Custom mappings (have to be created by the user, e.g. using the extract_custom_mappings.py script)
+CUSTOM_ENTITY_TO_NAME_FILE = DATA_DIRECTORY + "custom_mappings/entity_to_name.tsv"
+CUSTOM_ENTITY_TO_TYPES_FILE = DATA_DIRECTORY + "custom_mappings/entity_to_types.tsv"
+CUSTOM_WHITELIST_TYPES_FILE = DATA_DIRECTORY + "custom_mappings/whitelist_types.tsv"
 
 # Spacy knowledge base files
 KB_FILE = DATA_DIRECTORY + "linker_files/spacy/knowledge_bases/wikidata/kb"
@@ -74,7 +82,8 @@ VECTORS_DIRECTORY = DATA_DIRECTORY + "linker_files/spacy/knowledge_bases/vectors
 VECTORS_ABSTRACTS_DIRECTORY = DATA_DIRECTORY + "linker_files/spacy/knowledge_bases/vectors/vectors_abstracts/"
 
 # Linker files
-SPACY_MODEL_DIRECTORY = DATA_DIRECTORY + "linker_files/spacy/models/"
+LINKER_FILES = DATA_DIRECTORY + "linker_files/"
+SPACY_MODEL_DIRECTORY = LINKER_FILES + "spacy/models/"
 
 LINKER_MODEL_PATH = DATA_DIRECTORY + "linker_files/nn_linker_models/"
 RDF2VEC_MODEL_PATH = DATA_DIRECTORY + "linker_files/entity_embeddings/wikid2vec_sg_500_7_4_15_4_500"
@@ -82,18 +91,6 @@ RDF2VEC_MODEL_PATH = DATA_DIRECTORY + "linker_files/entity_embeddings/wikid2vec_
 
 # Benchmark files
 AIDA_CONLL_BENCHMARK_FILE = DATA_DIRECTORY + "benchmarks/aida/AIDA-YAGO2-dataset.tsv"
-
-ACE04_BENCHMARK_TEXTS = DATA_DIRECTORY + "benchmarks/ace2004/RawText/"
-ACE04_BENCHMARK_LABELS = DATA_DIRECTORY + "benchmarks/ace2004/ace2004.xml"
-
-ACE04_ORIGINAL_BENCHMARK_TEXTS = DATA_DIRECTORY + "benchmarks/ace2004.original/RawTextsNoTranscripts/"
-ACE04_ORIGINAL_BENCHMARK_LABELS = DATA_DIRECTORY + "benchmarks/ace2004.original/ProblemsNoTranscripts/"
-
-MSNBC_BENCHMARK_TEXTS = DATA_DIRECTORY + "benchmarks/msnbc-updated/RawText/"
-MSNBC_BENCHMARK_LABELS = DATA_DIRECTORY + "benchmarks/msnbc-updated/msnbc.xml"
-
-MSNBC_ORIGINAL_BENCHMARK_TEXTS = DATA_DIRECTORY + "benchmarks/msnbc/RawTextsSimpleChars_utf8/"
-MSNBC_ORIGINAL_BENCHMARK_LABELS = DATA_DIRECTORY + "benchmarks/msnbc/Problems/"
 
 BENCHMARK_DIR = "benchmarks/"
 WIKI_EX_BENCHMARK_FILE = BENCHMARK_DIR + "wiki-ex.benchmark.jsonl"

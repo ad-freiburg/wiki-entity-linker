@@ -1,5 +1,5 @@
 import logging
-from typing import Set, Optional, Dict, Tuple, List
+from typing import Optional, Dict, Tuple, List
 
 from src import settings
 from src.evaluation.case import Case, ErrorLabel, EvaluationMode
@@ -13,22 +13,24 @@ from src.evaluation.errors import label_errors
 logger = logging.getLogger("main." + __name__.split(".")[-1])
 
 
-def load_evaluation_entities(relevant_entity_ids: Set[str], type_mapping_file: str) -> EntityDatabase:
+def load_evaluation_entities(type_mapping_file: str, custom_mappings: bool) -> EntityDatabase:
     logger.info("Initializing entity database for evaluation ...")
     entity_db = EntityDatabase()
-    mapping = EntityDatabaseReader.get_wikipedia_to_wikidata_mapping()
-    mapping_entity_ids = set(mapping.values())
-    relevant_entity_ids.update(mapping_entity_ids)
-    entity_db.load_sitelink_counts()
-    entity_db.load_entities(relevant_entity_ids, type_mapping=type_mapping_file)
-    entity_db.load_wikipedia_wikidata_mapping()
-    entity_db.load_redirects()
-    entity_db.load_demonyms()
-    entity_db.load_quantities()
-    entity_db.load_datetimes()
-    entity_db.add_name_aliases()
-    entity_db.add_wikidata_aliases()
-    entity_db.add_link_aliases()
+    if custom_mappings:
+        entity_db.load_custom_entity_names(settings.CUSTOM_ENTITY_TO_NAME_FILE)
+        entity_db.load_custom_entity_types(settings.CUSTOM_ENTITY_TO_TYPES_FILE)
+    else:
+        entity_db.load_sitelink_counts()
+        entity_db.load_entity_names()
+        entity_db.load_entity_types(type_mapping_file)
+        entity_db.load_wikipedia_to_wikidata_db()
+        entity_db.load_redirects()
+        entity_db.load_demonyms()
+        entity_db.load_quantities()
+        entity_db.load_datetimes()
+        entity_db.load_family_name_aliases()
+        entity_db.load_alias_to_entities()
+        entity_db.load_link_aliases()
     logger.info("-> Entity database initialized.")
     return entity_db
 
@@ -61,8 +63,8 @@ def create_f1_dict_from_counts(counts: Dict):
     return create_f1_dict(counts["tp"], counts["fp"], counts["fn"])
 
 
-def get_type_ids(types: str) -> List[str]:
-    type_ids = [typ for typ in types.split("|") if typ not in ["DATETIME", "QUANTITY"]]
+def get_type_ids(types: List[str]) -> List[str]:
+    type_ids = [typ for typ in types if typ not in ["DATETIME", "QUANTITY"]]
     if not type_ids:  # Datetimes and Quantities are assigned type OTHER
         type_ids = [GroundtruthLabel.OTHER]
     return type_ids
@@ -73,12 +75,12 @@ EVALUATION_CATEGORIES = ("all", "ner", "entity", "entity_named", "entity_other",
 
 class Evaluator:
     def __init__(self,
-                 relevant_entity_ids: Set[str],
                  type_mapping_file: Optional[str],
                  whitelist_file: Optional[str] = settings.WHITELIST_FILE,
-                 contains_unknowns: bool = True):
+                 contains_unknowns: Optional[bool] = True,
+                 custom_mappings: Optional[bool] = False):
         self.whitelist_types = EntityDatabaseReader.read_whitelist_types(whitelist_file, with_adjustments=True)
-        self.entity_db = load_evaluation_entities(relevant_entity_ids, type_mapping_file)
+        self.entity_db = load_evaluation_entities(type_mapping_file, custom_mappings)
         self.case_generator = CaseGenerator(self.entity_db)
         self.contains_unknowns = contains_unknowns
         self.has_candidates = False
@@ -147,7 +149,7 @@ class Evaluator:
             if case.is_coreference():
                 self.counts[eval_mode]["coref"]["tp"] += 1
             else:
-                for type_id in get_type_ids(case.true_entity.type):
+                for type_id in get_type_ids(case.true_entity.type.split("|")):
                     self.type_counts[eval_mode][type_id]["tp"] += 1
         if case.is_linking_fn(eval_mode) and case.true_entity.parent is None:
             self.counts[eval_mode]["all"]["fn"] += 1
@@ -156,7 +158,7 @@ class Evaluator:
             if case.is_coreference():
                 self.counts[eval_mode]["coref"]["fn"] += 1
             else:
-                for type_id in get_type_ids(case.true_entity.type):
+                for type_id in get_type_ids(case.true_entity.type.split("|")):
                     self.type_counts[eval_mode][type_id]["fn"] += 1
         if case.is_linking_fp(eval_mode) and case.factor != 0:
             self.counts[eval_mode]["all"]["fp"] += 1
@@ -166,9 +168,8 @@ class Evaluator:
                 self.counts[eval_mode]["coref"]["fp"] += 1
             else:
                 pred_entity_id = case.predicted_entity.entity_id
-                if self.entity_db.contains_entity(pred_entity_id):
-                    type_ids = get_type_ids(self.entity_db.get_entity(pred_entity_id).type)
-                else:
+                type_ids = get_type_ids(self.entity_db.get_entity_types(pred_entity_id))
+                if not type_ids:
                     type_ids = [GroundtruthLabel.OTHER]
                 for type_id in type_ids:
                     self.type_counts[eval_mode][type_id]["fp"] += 1

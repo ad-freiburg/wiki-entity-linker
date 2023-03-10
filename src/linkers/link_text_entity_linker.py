@@ -45,15 +45,12 @@ class LinkTextEntityLinker:
         """
         Add all aliases of the given entity to the given synonym dictionary.
         """
-        if self.entity_db.contains_entity(entity_id):
-            entity = self.entity_db.get_entity(entity_id)
-            synonyms = entity.synonyms
-            title_synonyms = entity.title_synonyms
-            akronyms = entity.akronyms
-            for syn in title_synonyms | synonyms | akronyms:
-                # Do not append all lowercase synonyms (e.g. "it" for Italy)
-                if not syn.islower() and syn not in synonym_dict:
-                    synonym_dict[syn] = entity_id
+        synonyms = self.entity_db.get_entity_aliases(entity_id)
+
+        for syn in synonyms:
+            # Do not append all lowercase synonyms (e.g. "it" for Italy)
+            if not syn.islower() and syn not in synonym_dict:
+                synonym_dict[syn] = entity_id
 
     def link_entities(self, article: Article, doc: Optional[Doc] = None):
         if doc is None:

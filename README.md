@@ -25,25 +25,29 @@ Unless otherwise noted, all the following commands should be run inside the dock
 
 
 ## Get the Data
+
+(Note: If you want to use a custom ontology or knowledge base instead of Wikidata/Wikipedia/DBpedia you can skip this
+ step and instead follow the instructions in [Use a Custom Ontology](docs/use_custom_ontology.md).)
+
 For linking entities in text or evaluating the output of a linker, our system needs information about entities and
  mention texts, e.g. entity names, aliases, popularity scores, types, the frequency with which a mention is linked
  to a certain article in Wikipedia, etc. This information is stored in and read from several files. Since these files
  are too large to upload them on GitHub, you can either download them from our servers (fast) or build them yourself
  (slow, RAM intensive, but the resulting files might be based on a more recent Wikidata/Wikipedia dump).
 
-To download the files, run the following three commands:
+To download the files, simply run
 
-    make download_wikidata_mappings
-    make download_wikipedia_mappings
-    make download_entity_types_mapping
+    make download_all
 
-This will download the compressed files, extract them and move them to the correct location. See
- [Mapping Files](docs/mapping_files.md) for a description of files generated in these steps.
+This will automatically run `make download_wikidata_mappings`, `make download_wikipedia_mappings` and
+ `make download_entity_types_mapping` which will download the compressed files, extract them and move them to the
+ correct location. See [Mapping Files](docs/mapping_files.md) for a description of files downloaded in this steps.
 
 NOTE: This will overwrite existing Wikidata and Wikipedia mappings in your `<data_directory>` so make sure this is what 
  you want to do.
 
-If you rather want to build the mappings yourself, you can replace each *download* command by a *generate* command. See
+If you rather want to build the mappings yourself, you can replace each *download* command (except `download_all`) by a
+ *generate* command. See
  [Data Generation](docs/data_generation.md) for more details.
 
 ## Link Wikipedia Dump
@@ -93,16 +97,11 @@ To start the evaluation web app, run
 
 You can then access the webapp at <http://0.0.0.0:8000/>.
 
-In the benchmark dropdown menu, you can select any benchmark for which a benchmark file in the correct format exists at
- `benchmarks/<benchmark_name>.benchmark.jsonl`. See [Included Benchmarks](docs/included_benchmarks.md) for
- details on benchmarks that are already included in ELEVANT. The section [Add a Benchmark](#add-a-benchmark) explains
- how you can add more benchmarks yourself.
-
-A benchmark's evaluation results table contains one row for each experiment. In ELEVANT, an experiment is a run of a
+The evaluation results table contains one row for each experiment. In ELEVANT, an experiment is a run of a
  particular entity linker with particular linker settings on a particular benchmark. We already added a few experiments,
  including oracle predictions (perfect linking results generated from the ground truth), so you can start exploring
- the web app right away. The section [Add an Experiment](#add-an-experiment) explains how you can add more
- experiments yourself.
+ the web app right away. The section [Add a Benchmark](#add-a-benchmark) explains how you can add more benchmarks
+ and the section [Add an Experiment](#add-an-experiment) explains how you can add more experiments yourself.
 
 See [Evaluation Web App](docs/evaluation_webapp.md) for a detailed overview of the web app's features.
 
@@ -120,8 +119,6 @@ To add a benchmark, simply run
 This converts the `<benchmark_file>` into our JSONL format (if it is not in this format already), annotates ground
  truth labels with their Wikidata label and Wikidata types and writes the result to the file
  `benchmarks/<benchmark_name>.benchmark.jsonl`.
-
-In the web app, reload the page and the benchmark will show up in the benchmark dropdown menu.
 
 The benchmark can now be linked with a linker of your choice using the `link_benchmark_entities.py` script with the
  parameter `-b <benchmark_name>`. See section [Add an Experiment](#add-an-experiment) for details on how to link a
@@ -177,7 +174,7 @@ will create the files `evaluation-results/popular-entities/ltl.popular-entities.
  `eval_results` file contains the scores that are shown in the web app's evaluation results table.
 
 
-In the web app, simply reload the page and the experiment will show up as a row in the evaluation results table of
+In the web app, simply reload the page and the experiment will show up as a row in the evaluation results table for
  the corresponding benchmark.
 
 See [Evaluate Linking Results](docs/evaluate_linking_results.md) for instructions on how to evaluate multiple linking

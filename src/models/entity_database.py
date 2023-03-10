@@ -4,6 +4,8 @@ from typing import Dict, Set, Tuple, Iterator, Optional, List, Any
 import logging
 
 from src import settings
+from src.evaluation.groundtruth_label import GroundtruthLabel
+from src.models.database import Database
 from src.models.gender import Gender
 from src.models.wikidata_entity import WikidataEntity
 from src.helpers.entity_database_reader import EntityDatabaseReader
@@ -12,9 +14,9 @@ logger = logging.getLogger("main." + __name__.split(".")[-1])
 
 
 class MappingName(Enum):
-    NAME_ALIASES = "name_aliases"
-    LINK_ALIASES = "link_aliases"
     WIKIDATA_ALIASES = "wikidata_aliases"
+    FAMILY_NAME_ALIASES = "family_name_aliases"
+    LINK_ALIASES = "link_aliases"
     TITLE_SYNONYMS = "title_synonyms"
     AKRONYMS = "akronyms"
     SITELINKS = "sitelinks"
@@ -22,12 +24,16 @@ class MappingName(Enum):
     WIKIPEDIA_WIKIDATA = "wikipedia_wikidata"
     REDIRECTS = "redirects"
     LINK_FREQUENCIES = "link_frequencies"
+    NAMES = "names"
     GENDER = "gender"
     COREFERENCE_TYPES = "coreference_types"
     LANGUAGES = "languages"
     DEMONYMS = "demonyms"
-    NAMES = "names"
     WIKIPEDIA_ID_WIKIPEDIA_TITLE = "wikipedia_id_wikipedia_title"
+    NAME_TO_ENTITY_ID = "name_to_entity_id"
+    ENTITY_ID_TO_ALIAS = "entity_id_to_alias"
+    ENTITY_ID_TO_FAMILY_NAME = "entity_id_to_family_name"
+    ENTITY_ID_TO_LINK_ALIAS = "entity_id_to_link_alias"
 
 
 class LoadingType(Enum):
@@ -46,30 +52,46 @@ class EntityDatabase:
     def __init__(self):
         self.entities = {}
         self.entities: Dict[str, WikidataEntity]
-        self.entities_by_name = {}
-        self.entities_by_name: Dict[str, Set[str]]
+        self.name_to_entities_db = {}
+        self.name_to_entities_db: Dict[str, Set[str]]
+        self.entity_type_db = {}
+        self.entity_type_db: Database
+        self.entity_name_db = {}
+        self.entity_name_db: Database
+        self.alias_to_entities_db = {}
+        self.alias_to_entities_db: Database
+        self.family_name_aliases = {}
+        self.family_name_aliases: Dict[str, Set[str]]
+        self.link_aliases = {}
+        self.link_aliases: Dict[str, Set[str]]
+        self.entity_to_aliases_db = {}
+        self.entity_to_aliases_db: Database
+        self.entity_to_family_name = {}
+        self.entity_to_family_name: Dict[str, str]
+        self.entity_to_link_alias = {}
+        self.entity_to_link_alias: Dict[str, str]
         self.aliases = {}
         self.aliases: Dict[str, Set[str]]
         self.wikipedia2wikidata = {}
-        self.wikipedia2wikidata: Dict[str, str]
+        self.wikipedia2wikidata: Database
         self.wikidata2wikipedia = {}
         self.wikidata2wikipedia: Dict[str, str]
         self.redirects = {}
-        self.redirects: Dict[str, str]
-        self.title_synonyms = {}
-        self.title_synonyms: Dict[str, Set[str]]
-        self.akronyms = {}
-        self.akronyms: Dict[str, Set[str]]
+        self.redirects: Database
         self.link_frequencies = {}
         self.link_frequencies: Dict[str, Tuple[str, int]]
         self.entity_frequencies = {}
         self.entity_frequencies: Dict[str, int]
-        self.entity2gender = {}
-        self.entity2gender: Dict[str, Gender]
         self.given_names = {}
         self.given_names: Dict[str, str]
         self.family_names = {}
         self.family_names: Dict[str, str]
+        self.title_synonyms = {}
+        self.title_synonyms: Dict[str, Set[str]]
+        self.akronyms = {}
+        self.akronyms: Dict[str, Set[str]]
+        self.entity2gender = {}
+        self.entity2gender: Dict[str, Gender]
         self.entity2coreference_types = {}
         self.entity2coreference_types: Dict[str, List[str]]
         self.unigram_counts = {}
@@ -79,136 +101,246 @@ class EntityDatabase:
         self.quantities = set()
         self.datetimes = set()
         self.wikipedia_id2wikipedia_title = dict()
+        self.type_adjustments = {}
         self.loaded_info = {}
-
-    def add_entity(self, entity: WikidataEntity):
-        self.entities[entity.entity_id] = entity
-        if entity.name not in self.entities_by_name:
-            self.entities_by_name[entity.name] = {entity.entity_id}
-        else:
-            self.entities_by_name[entity.name].add(entity.entity_id)
 
     def contains_entity(self, entity_id: str) -> bool:
         return entity_id in self.entities
 
-    def contains_entity_name(self, entity_name: str) -> bool:
-        return entity_name in self.entities_by_name
-
-    def get_entities_by_name(self, entity_name: str) -> Set[str]:
-        return self.entities_by_name[entity_name]
-
-    def get_entity(self, entity_id: str) -> WikidataEntity:
-        return self.entities[entity_id]
-
-    def load_all_entities_in_wikipedia(self, minimum_sitelink_count: Optional[int] = 0,
-                                       type_mapping: Optional[str] = settings.WHITELIST_TYPE_MAPPING):
+    def load_all_entities_in_wikipedia(self, minimum_sitelink_count: Optional[int] = 0):
         logger.info("Loading entities from Wikipedia to Wikidata mapping into entity database ...")
-        mapping = EntityDatabaseReader.get_wikipedia_to_wikidata_mapping()
-        entity_ids = set(mapping.values())
-        self.load_entities(entity_ids, minimum_sitelink_count, type_mapping)
-
-    def load_entities(self, entity_ids: Set[str], minimum_sitelink_count: Optional[int] = 0,
-                      type_mapping: Optional[str] = settings.WHITELIST_TYPE_MAPPING):
         self.loaded_info[MappingName.ENTITIES] = LoadedInfo(LoadingType.RELEVANT_ENTITIES,
                                                             minimum_sitelink_count)
-        logger.info("Loading %d relevant entities with sitelink count >= %d into entity database ..."
-                    % (len(entity_ids), minimum_sitelink_count))
-        entities = EntityDatabaseReader.get_wikidata_entities_with_types(entity_ids, type_mapping)
-        if minimum_sitelink_count > 0:
+        db = EntityDatabaseReader.get_wikipedia_to_wikidata_db()
+        entity_ids = set(db.values())
+        if minimum_sitelink_count == 0:
+            self.entities = entity_ids
+        else:
             # If a minimum sitelink count is given, load sitelink mapping to check
             # entity sitelink counts against the given minimum sitelink count
-            self.load_sitelink_counts(minimum_sitelink_count)
-        for entity in entities.values():
-            if minimum_sitelink_count == 0 or minimum_sitelink_count <= self.get_sitelink_count(entity.entity_id):
-                self.add_entity(entity)
-        logger.info("-> Entity database contains %d entities." % self.size_entities())
+            self.load_sitelink_counts()
+            for entity_id in entity_ids:
+                if minimum_sitelink_count <= self.get_sitelink_count(entity_id):
+                    self.entities.add(entity_id)
+        logger.info(f"-> Entity database contains {len(self.entities)} entities.")
 
-    def size_entities(self) -> int:
-        return len(self.entities)
-
-    def add_alias(self, alias: str, entity_id: str):
-        if alias not in self.aliases:
-            self.aliases[alias] = {entity_id}
+    def load_entity_types(self, type_db: Optional[str] = settings.QID_TO_WHITELIST_TYPES_DB):
+        if not self.entity_type_db:
+            self.entity_type_db = EntityDatabaseReader.get_whitelist_types_db(type_db)
         else:
-            self.aliases[alias].add(entity_id)
-        self.entities[entity_id].synonyms.add(alias)
+            logger.info("Entity type database already loaded.")
 
-    def add_wikidata_aliases(self):
-        logger.info("Loading Wikidata aliases into entity database ...")
+    def load_custom_entity_types(self, filename: str):
+        if not self.entity_type_db:
+            self.entity_type_db = EntityDatabaseReader.get_entity_types_mapping(filename)
+        else:
+            logger.info("Entity type mapping already loaded.")
+
+    def get_entity_types(self, entity_id: str) -> Optional[List[str]]:
+        if len(self.entity_type_db) == 0:
+            logger.warning("Tried to access entity type database, but entity type database was not loaded.")
+            return None
+        return self.adjusted_entity_types(entity_id)
+
+    def adjusted_entity_types(self, entity_id: str) -> List[str]:
+        if not self.type_adjustments:
+            self.type_adjustments = EntityDatabaseReader.read_whitelist_type_adjustments()
+        adj_replace = self.type_adjustments["REPLACE_WITH"]
+        adj_minus = self.type_adjustments["MINUS"]
+        if entity_id in self.entity_type_db:
+            whitelist_types = self.entity_type_db[entity_id]
+            adjusted_types = []
+            for wt in whitelist_types:
+                # Perform type adjustments
+                adjusted_type = adj_replace[wt] if wt in adj_replace else wt
+                if adjusted_type in adj_minus and adj_minus[adjusted_type] in adjusted_types:
+                    # Type is left element of minus-rule and right element is already in the entity's type list.
+                    # Don't add type.
+                    continue
+                for t in adjusted_types:
+                    if t in adj_minus and adjusted_type == adj_minus[t]:
+                        # Type is right element of minus-rule and left element is already in the entity's type list.
+                        # Remove previously added type.
+                        adjusted_types.remove(t)
+
+                if adjusted_type not in adjusted_types:
+                    # Due to the adjustment, the same type might be added twice without this check
+                    adjusted_types.append(adjusted_type)
+
+            return adjusted_types
+        else:
+            return [GroundtruthLabel.OTHER]
+
+    def load_entity_names(self):
+        if not self.entity_name_db:
+            self.entity_name_db = EntityDatabaseReader.get_entity_name_db()
+        else:
+            logger.info("Entity name database already loaded.")
+
+    def load_custom_entity_names(self, filename: str):
+        if not self.entity_name_db:
+            self.entity_name_db = EntityDatabaseReader.get_entity_name_mapping(filename)
+        else:
+            logger.info("Entity name mapping already loaded.")
+
+    def get_entity_name(self, entity_id: str) -> Optional[str]:
+        if len(self.entity_name_db) == 0:
+            logger.warning("Tried to access entity name database, but entity name database was not loaded.")
+            return None
+        return self.entity_name_db[entity_id] if entity_id in self.entity_name_db else "Unknown"
+
+    def load_name_to_entities(self):
+        self.loaded_info[MappingName.NAME_TO_ENTITY_ID] = LoadedInfo(LoadingType.FULL)
+        if not self.name_to_entities_db:
+            self.name_to_entities_db = EntityDatabaseReader.get_name_to_entities_db()
+        else:
+            logger.info("Entity name to entity IDs database already loaded.")
+
+    def contains_entity_name(self, entity_name: str) -> bool:
+        return entity_name in self.name_to_entities_db
+
+    def get_entities_by_name(self, entity_name: str) -> Set[str]:
+        return self.name_to_entities_db[entity_name]
+
+    def load_alias_to_entities(self):
         self.loaded_info[MappingName.WIKIDATA_ALIASES] = LoadedInfo(LoadingType.FULL)
-        alias_mapping = EntityDatabaseReader.read_wikidata_aliases()
-        for entity_id in self.entities:
-            if entity_id in alias_mapping:
-                aliases = alias_mapping[entity_id]
-                for alias in aliases:
-                    self.add_alias(alias, entity_id)
-        logger.info("-> Entity database contains %d aliases." % self.size_aliases())
+        if not self.alias_to_entities_db:
+            self.alias_to_entities_db = EntityDatabaseReader.get_alias_to_entities_db()
+        else:
+            logger.info("Entity aliases database already loaded.")
+        # The entity name is also an alias, so load it too.
+        self.load_name_to_entities()
 
-    def add_name_aliases(self):
+    def load_family_name_aliases(self):
         logger.info("Loading family name aliases into entity database ...")
-        self.loaded_info[MappingName.NAME_ALIASES] = LoadedInfo(LoadingType.FULL)
-        for entity_id, name in EntityDatabaseReader.read_names():
-            if self.contains_entity(entity_id) and " " in name:
+        self.loaded_info[MappingName.FAMILY_NAME_ALIASES] = LoadedInfo(LoadingType.FULL)
+        for entity_id, name in EntityDatabaseReader.read_human_names():
+            if " " in name:
                 family_name = name.split()[-1]
-                self.add_alias(family_name, entity_id)
-        logger.info("-> Entity database contains %d aliases" % self.size_aliases())
+                if family_name in self.family_name_aliases:
+                    self.family_name_aliases[family_name].add(entity_id)
+                else:
+                    self.family_name_aliases[family_name] = {entity_id}
+        logger.info(f"-> {len(self.family_name_aliases)} family name aliases loaded into entity database.")
 
-    def size_aliases(self) -> int:
-        return len(self.aliases)
+    def load_link_aliases(self):
+        logger.info("Loading link aliases into entity database ...")
+        self.loaded_info[MappingName.LINK_ALIASES] = LoadedInfo(LoadingType.FULL)
+        for link_text, entity_id, frequency in self._iterate_link_frequencies():
+            if link_text in self.link_aliases:
+                self.link_aliases[link_text].add(entity_id)
+            else:
+                self.link_aliases[link_text] = {entity_id}
+        logger.info(f"-> {len(self.link_aliases)} link aliases loaded into entity database.")
+
+    def get_candidates(self, alias: str) -> Set[str]:
+        entity_ids = set()
+        if alias in self.name_to_entities_db:
+            entity_ids = entity_ids.union(self.name_to_entities_db[alias])
+        if alias in self.alias_to_entities_db:
+            entity_ids = entity_ids.union(self.alias_to_entities_db[alias])
+        if alias in self.family_name_aliases:
+            entity_ids = entity_ids.union(self.family_name_aliases[alias])
+        if alias in self.link_aliases:
+            entity_ids = entity_ids.union(self.link_aliases[alias])
+        return entity_ids
 
     def contains_alias(self, alias: str) -> bool:
-        return alias in self.aliases
+        return alias in self.name_to_entities_db or \
+               alias in self.alias_to_entities_db or \
+               alias in self.family_name_aliases or \
+               alias in self.link_aliases
 
-    def load_wikipedia_wikidata_mapping(self):
-        logger.info("Loading Wikipedia to Wikidata mapping into entity database ...")
-        mapping = EntityDatabaseReader.get_wikipedia_to_wikidata_mapping()
-        for entity_name in mapping:
-            entity_id = mapping[entity_name]
-            self.wikipedia2wikidata[entity_name] = entity_id
-            self.wikidata2wikipedia[entity_id] = entity_name
-        logger.info("-> Entity database contains %d mappings from Wikipedia to Wikidata and %d mappings from Wikidata"
-                    "to Wikipedia" % (len(self.wikipedia2wikidata), len(self.wikidata2wikipedia)))
+    def load_entity_to_aliases(self):
+        self.loaded_info[MappingName.ENTITY_ID_TO_ALIAS] = LoadedInfo(LoadingType.FULL)
+        if not self.entity_to_aliases_db:
+            self.entity_to_aliases_db = EntityDatabaseReader.get_entity_to_aliases_db()
+        else:
+            logger.info("Entity ID to aliases database already loaded.")
+        # The entity name is also an alias, so load it too.
+        self.load_entity_names()
 
-    def is_wikipedia_wikidata_mapping_loaded(self) -> bool:
-        return len(self.wikidata2wikipedia) > 0 and len(self.wikipedia2wikidata) > 0
+    def load_entity_to_family_name(self):
+        logger.info("Loading entity ID to family name aliases into entity database ...")
+        self.loaded_info[MappingName.ENTITY_ID_TO_FAMILY_NAME] = LoadedInfo(LoadingType.FULL)
+        for entity_id, name in EntityDatabaseReader.read_human_names():
+            if " " in name:
+                family_name = name.split()[-1]
+                self.entity_to_family_name[entity_id] = family_name
+        logger.info(f"-> {len(self.entity_to_family_name)} entity ID to family name aliases "
+                    f"loaded into entity database.")
 
-    def load_redirects(self):
-        logger.info("Loading redirects into entity database ...")
-        self.redirects = EntityDatabaseReader.get_link_redirects()
-        logger.info("-> Redirects loaded into entity database.")
-
-    def is_redirects_loaded(self) -> bool:
-        return len(self.redirects) > 0
+    def load_entity_to_link_aliases(self):
+        logger.info("Loading entity ID to link aliases into entity database ...")
+        self.loaded_info[MappingName.ENTITY_ID_TO_LINK_ALIAS] = LoadedInfo(LoadingType.FULL)
+        for link_text, entity_id, frequency in self._iterate_link_frequencies():
+            if link_text in self.link_aliases:
+                self.entity_to_link_alias[entity_id].add(link_text)
+            else:
+                self.entity_to_link_alias[entity_id] = {link_text}
+        logger.info(f"-> {len(self.link_aliases)} entity ID to link alias mappings loaded into entity database.")
 
     def load_title_synonyms(self):
-        logger.info("Loading title synonyms into entity database ...")
-        self.title_synonyms = EntityDatabaseReader.get_title_synonyms()
-        if not self.entities:
-            logger.warning("Entity database does not contain any entities. Title synonyms will not be added.")
-        for synonym, entity_set in self.title_synonyms.items():
+        title_synonym_to_entities = EntityDatabaseReader.get_title_synonyms()
+        for synonym, entity_set in title_synonym_to_entities.items():
             for entity_title in entity_set:
                 entity_id = self.link2id(entity_title)
-                if entity_id is not None and self.contains_entity(entity_id):
-                    self.entities[entity_id].add_title_synonym(synonym)
-        logger.info("-> Title synonyms loaded into entity database.")
+                if entity_id is not None:
+                    if entity_id not in self.title_synonyms:
+                        self.title_synonyms[entity_id] = set()
+                    self.title_synonyms[entity_id].add(synonym)
 
     def is_title_synonyms_loaded(self) -> bool:
         return len(self.title_synonyms) > 0
 
     def load_akronyms(self):
-        logger.info("Loading akronyms into entity database ...")
-        self.akronyms = EntityDatabaseReader.get_akronyms()
-        if not self.entities:
-            logger.warning("Entity database does not contain any entities. Akronyms will not be added.")
-        for akronym, entity_set in self.akronyms.items():
+        akronym_to_entities = EntityDatabaseReader.get_akronyms()
+        for akronym, entity_set in akronym_to_entities.items():
             for entity_title in entity_set:
                 entity_id = self.link2id(entity_title)
-                if entity_id is not None and self.contains_entity(entity_id):
-                    self.entities[entity_id].add_akronym(akronym)
-        logger.info("-> Akronyms loaded into entity database.")
+                if entity_id is not None:
+                    if entity_id not in self.akronyms:
+                        self.akronyms[entity_id] = set()
+                    self.akronyms[entity_id].add(akronym)
 
     def is_akronyms_loaded(self) -> bool:
         return len(self.akronyms) > 0
+
+    def get_entity_aliases(self, entity_id: str) -> Optional[Set[str]]:
+        aliases = set()
+        if entity_id in self.entity_name_db:
+            aliases = aliases.union(self.entity_name_db[entity_id])
+        if entity_id in self.entity_to_aliases_db:
+            aliases = aliases.union(self.entity_to_aliases_db[entity_id])
+        if entity_id in self.entity_to_family_name:
+            aliases = aliases.union(self.entity_to_family_name[entity_id])
+        if entity_id in self.entity_to_link_alias:
+            aliases = aliases.union(self.entity_to_link_alias[entity_id])
+        if entity_id in self.title_synonyms:
+            aliases = aliases.union(self.title_synonyms[entity_id])
+        if entity_id in self.akronyms:
+            aliases = aliases.union(self.akronyms[entity_id])
+        return aliases
+
+    def load_wikipedia_to_wikidata_db(self):
+        self.wikipedia2wikidata = EntityDatabaseReader.get_wikipedia_to_wikidata_db()
+
+    def load_wikidata_to_wikipedia_mapping(self):
+        self.wikipedia2wikidata = EntityDatabaseReader.get_wikipedia_to_wikidata_db()
+        for wikipedia_name, entity_id in self.wikipedia2wikidata.items():
+            self.wikidata2wikipedia[entity_id] = wikipedia_name
+
+    def is_wikipedia_to_wikidata_mapping_loaded(self) -> bool:
+        return len(self.wikipedia2wikidata) > 0
+
+    def is_wikidata_to_wikipedia_mapping_loaded(self) -> bool:
+        return len(self.wikidata2wikipedia) > 0
+
+    def load_redirects(self):
+        self.redirects = EntityDatabaseReader.get_redirects_db()
+
+    def is_redirects_loaded(self) -> bool:
+        return len(self.redirects) > 0
 
     def link2id(self, link_target: str) -> Optional[str]:
         link_target_variants = [link_target]
@@ -232,19 +364,11 @@ class EntityDatabase:
         for link_text in link_frequencies:
             for link_target in link_frequencies[link_text]:
                 entity_id = self.link2id(link_target)
-                if entity_id is not None and self.contains_entity(entity_id):
+                if entity_id is not None:
                     frequency = link_frequencies[link_text][link_target]
                     yield link_text, entity_id, frequency
 
-    def add_link_aliases(self):
-        logger.info("Loading link aliases into entity database ...")
-        self.loaded_info[MappingName.LINK_ALIASES] = LoadedInfo(LoadingType.FULL)
-        for link_text, entity_id, frequency in self._iterate_link_frequencies():
-            self.add_alias(link_text, entity_id)
-        logger.info("-> Entity database contains %d aliases." % self.size_aliases())
-
     def load_link_frequencies(self):
-        logger.info("Loading link frequencies into entity database ...")
         for link_text, entity_id, frequency in self._iterate_link_frequencies():
             if link_text not in self.link_frequencies:
                 self.link_frequencies[link_text] = {}
@@ -256,16 +380,9 @@ class EntityDatabase:
                 self.entity_frequencies[entity_id] = frequency
             else:
                 self.entity_frequencies[entity_id] += frequency
-        logger.info("-> Link frequencies loaded into entity database.")
 
     def is_link_frequencies_loaded(self) -> bool:
         return len(self.link_frequencies) > 0
-
-    def get_candidates(self, alias: str) -> Set[str]:
-        if alias not in self.aliases:
-            return set()
-        else:
-            return self.aliases[alias]
 
     def get_link_frequency(self, alias: str, entity_id: str) -> int:
         if alias not in self.link_frequencies or entity_id not in self.link_frequencies[alias]:
@@ -281,25 +398,9 @@ class EntityDatabase:
     def get_entity_frequency(self, entity_id: str) -> int:
         return self.entity_frequencies[entity_id] if entity_id in self.entity_frequencies else 0
 
-    def load_gender(self):
-        logger.info("Loading gender mapping into entity database ...")
-        self.entity2gender = EntityDatabaseReader.get_gender_mapping()
-        logger.info("-> Gender mapping loaded into entity database.")
-
-    def is_gender_loaded(self) -> bool:
-        return len(self.entity2gender) > 0
-
-    def get_gender(self, entity_id: str) -> Gender:
-        if len(self.entity2gender) == 0:
-            logger.warning("Tried to access gender information but gender mapping was not loaded.")
-        elif entity_id in self.entity2gender:
-            return self.entity2gender[entity_id]
-        else:
-            return Gender.NEUTRAL
-
     def load_names(self):
         logger.info("Loading family and given names into entity database ...")
-        for entity_id, name in EntityDatabaseReader.read_names():
+        for entity_id, name in EntityDatabaseReader.read_human_names():
             if " " in name:
                 given_name = name.split()[0]
                 family_name = name.split()[-1]
@@ -332,10 +433,22 @@ class EntityDatabase:
     def get_family_name(self, entity_id: str) -> str:
         return self.family_names[entity_id]
 
+    def load_gender(self):
+        self.entity2gender = EntityDatabaseReader.get_gender_mapping()
+
+    def is_gender_loaded(self) -> bool:
+        return len(self.entity2gender) > 0
+
+    def get_gender(self, entity_id: str) -> Gender:
+        if len(self.entity2gender) == 0:
+            logger.warning("Tried to access gender information but gender mapping was not loaded.")
+        elif entity_id in self.entity2gender:
+            return self.entity2gender[entity_id]
+        else:
+            return Gender.NEUTRAL
+
     def load_coreference_types(self):
-        logger.info("Loading coreference types into entity database...")
         self.entity2coreference_types = EntityDatabaseReader.get_coreference_types_mapping()
-        logger.info("-> Coreference types loaded into entity database.")
 
     def is_coreference_types_loaded(self) -> bool:
         return len(self.entity2coreference_types) > 0
@@ -347,21 +460,19 @@ class EntityDatabase:
         return self.entity2coreference_types[entity_id]
 
     def load_unigram_counts(self):
-        logger.info("Loading unigram counts into entity database...")
         self.unigram_counts = EntityDatabaseReader.get_unigram_counts()
-        logger.info("-> Unigram counts loaded into entity database.")
 
     def get_unigram_count(self, token: str) -> int:
         if token not in self.unigram_counts:
             return 0
         return self.unigram_counts[token]
 
-    def load_sitelink_counts(self, min_count: Optional[int] = 1):
-        logger.info("Loading sitelink counts >= %d into entity database ..." % min_count)
-        loading_type = LoadingType.RESTRICTED if min_count > 0 else LoadingType.FULL
-        self.loaded_info[MappingName.SITELINKS] = LoadedInfo(loading_type, min_count)
-        self.sitelink_counts = EntityDatabaseReader.get_sitelink_counts(min_count)
-        logger.info("-> Sitelink counts loaded into entity database.")
+    def load_sitelink_counts(self):
+        if self.loaded_info.get(MappingName.SITELINKS) == LoadedInfo(LoadingType.FULL):
+            logger.info("-> Sitelink counts already loaded.")
+        else:
+            self.loaded_info[MappingName.SITELINKS] = LoadedInfo(LoadingType.FULL)
+            self.sitelink_counts = EntityDatabaseReader.get_sitelink_db()
 
     def has_sitelink_counts_loaded(self) -> bool:
         return len(self.sitelink_counts) > 0
@@ -372,9 +483,7 @@ class EntityDatabase:
         return self.sitelink_counts[entity_id] if entity_id in self.sitelink_counts else 0
 
     def load_demonyms(self):
-        logger.info("Loading demonyms into entity database ...")
         self.demonyms = EntityDatabaseReader.get_demonyms()
-        logger.info("-> Demonyms loaded into entity database.")
 
     def has_demonyms_loaded(self) -> bool:
         return len(self.demonyms) > 0
@@ -388,9 +497,7 @@ class EntityDatabase:
         return self.demonyms[demonym]
 
     def load_languages(self):
-        logger.info("Loading languages into entity database ...")
         self.languages = EntityDatabaseReader.get_languages()
-        logger.info("-> Languages loaded into entity database.")
 
     def has_languages_loaded(self) -> bool:
         return len(self.languages) > 0
@@ -404,9 +511,7 @@ class EntityDatabase:
         return self.languages[language]
 
     def load_quantities(self):
-        logger.info("Loading quantities into entity database ...")
         self.quantities = EntityDatabaseReader.get_real_numbers()
-        logger.info("-> Quantities loaded into entity database.")
 
     def has_quantities_loaded(self) -> bool:
         return len(self.quantities) > 0
@@ -417,9 +522,7 @@ class EntityDatabase:
         return entity_id in self.quantities
 
     def load_datetimes(self):
-        logger.info("Loading datetimes into entity database ...")
         self.datetimes = EntityDatabaseReader.get_points_in_time()
-        logger.info("-> Datetimes loaded into entity database.")
 
     def has_datetimes_loaded(self) -> bool:
         return len(self.datetimes) > 0
@@ -430,9 +533,7 @@ class EntityDatabase:
         return entity_id in self.datetimes
 
     def load_wikipedia_id2wikipedia_title(self):
-        logger.info("Loading Wikipedia ID to Wikipedia title into entity database ...")
         self.wikipedia_id2wikipedia_title = EntityDatabaseReader.get_wikipedia_id2wikipedia_title_mapping()
-        logger.info("-> Wikipedia ID to Wikipedia title mapping loaded into entity database. ")
 
     def has_wikipedia_id2wikipedia_title_loaded(self) -> bool:
         return len(self.wikipedia_id2wikipedia_title) > 0

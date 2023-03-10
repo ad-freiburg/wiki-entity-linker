@@ -52,7 +52,8 @@ def main(args):
                                    args.link_linker,
                                    args.coreference_linker,
                                    args.minimum_score,
-                                   args.type_mapping)
+                                   args.type_mapping,
+                                   args.custom_mappings)
 
     for benchmark in args.benchmark:
         benchmark_iterator = get_benchmark_iterator(benchmark)
@@ -92,12 +93,12 @@ def main(args):
             elif "experiment_description" in linker_config:
                 exp_description = linker_config["experiment_description"]
             linker_name = None
-            if args.prediction_name:
-                linker_name = args.prediction_name
-            elif "linker_name" in linker_config:
+            if "linker_name" in linker_config:
                 linker_name = linker_config["linker_name"]
             elif args.linker_name:
                 linker_name = args.linker_name
+            elif args.prediction_name:
+                linker_name = args.prediction_name
             metadata = {"experiment_name": exp_name,
                         "experiment_description": exp_description,
                         "linker_name": linker_name,
@@ -148,11 +149,13 @@ if __name__ == "__main__":
                         help="Minimum entity score to include entity in database")
     parser.add_argument("--uppercase", action="store_true",
                         help="Set to remove all predictions on snippets which do not contain an uppercase character.")
-    parser.add_argument("--type_mapping", type=str, default=settings.WHITELIST_TYPE_MAPPING,
+    parser.add_argument("--type_mapping", type=str, default=settings.QID_TO_WHITELIST_TYPES_DB,
                         help="For pure prior linker: Map predicted entities to types using the given mapping.")
 
     parser.add_argument("--description", "-desc", type=str,
                         help="A description for the experiment. This will be displayed in the webapp.")
+    parser.add_argument("-c", "--custom_mappings", action="store_true",
+                        help="Use custom entity to name and entity to type mappings instead of Wikidata.")
 
     logger = log.setup_logger(sys.argv[0])
     logger.debug(' '.join(sys.argv))

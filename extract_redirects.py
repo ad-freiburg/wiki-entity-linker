@@ -11,7 +11,7 @@ from src import settings
 TITLE_START = "<title>"
 TITLE_END = "</title>"
 REDIRECT = "#REDIRECT"
-PRINT_EVERY = 100
+PRINT_EVERY = 10000
 
 
 def main(args):

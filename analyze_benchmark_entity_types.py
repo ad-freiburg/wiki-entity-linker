@@ -7,12 +7,17 @@ from src.evaluation.benchmark import get_available_benchmarks
 from src.evaluation.mention_type import is_named_entity
 from src.helpers.entity_database_reader import EntityDatabaseReader
 from src.models.article import article_from_json
+from src.models.entity_database import EntityDatabase
 
 
 def main(args):
     benchmark_name = args.benchmark_name
     in_file = "benchmarks/%s.benchmark.jsonl" % benchmark_name
     logger.info("Analyzing entity types in %s" % in_file)
+
+    # read entity labels
+    entity_db = EntityDatabase()
+    entity_db.load_entity_names()
 
     # read whitelist
     whitelist = EntityDatabaseReader.read_whitelist_types()
@@ -26,12 +31,6 @@ def main(args):
             articles.append(article)
             for label in article.labels:
                 entity_ids.add(label.entity_id)
-
-    # read entity labels
-    entity_names = {}
-    for entity_id, name in EntityDatabaseReader.entity_to_label_iterator():
-        if entity_id in entity_ids:
-            entity_names[entity_id] = name
 
     labels_tsv_filename = "benchmarks/" + benchmark_name + ".labels.tsv"
     types_json_filename = "benchmarks/" + benchmark_name + ".types.json"
@@ -55,7 +54,7 @@ def main(args):
                 types = ["UNKNOWN"]
             else:
                 types = label.get_types()
-            entity_name = entity_names[label.entity_id] if label.entity_id in entity_names else "Unknown"
+            entity_name = entity_db.get_entity_name(label.entity_id)
             labels_tsv_file.write("\t".join((mention,
                                              label.entity_id,
                                              entity_name,

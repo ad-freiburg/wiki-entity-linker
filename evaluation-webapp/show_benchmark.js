@@ -224,6 +224,9 @@ window.all_highlighted_annotations = [[], []];
 window.jump_to_annotation_index = [-1, -1];
 window.last_highlighted_side = 0;
 
+window.internal_experiment_filter = "";
+window.internal_benchmark_filter = "";
+
 window.url_param_experiment_filter = null;
 window.url_param_benchmark_filter = null;
 window.url_param_show_deprecated = null;
@@ -236,6 +239,8 @@ window.url_param_sort_order = null;
 window.url_param_access = null;
 window.url_param_evaluation_mode = null;
 window.url_param_group_by = null;
+window.url_param_internal_experiment_filter = null;
+window.url_param_internal_benchmark_filter = null;
 
 $("document").ready(function() {
     // JQuery selector variables
@@ -253,6 +258,13 @@ $("document").ready(function() {
         theme: 'light-border'
     });
 
+    // Set the table filter strings and show-deprecated checkbox according to the URL parameters
+    if (window.url_param_experiment_filter) $experiment_filter.val(window.url_param_experiment_filter);
+    if (window.url_param_benchmark_filter) $benchmark_filter.val(window.url_param_benchmark_filter);
+    if (window.url_param_internal_experiment_filter) window.internal_experiment_filter = new RegExp(window.url_param_internal_experiment_filter, "i");
+    if (window.url_param_internal_benchmark_filter) window.internal_benchmark_filter = new RegExp(window.url_param_internal_benchmark_filter, "i");
+    $("#checkbox_deprecated").prop('checked', window.url_param_show_deprecated);
+
     if (window.url_param_group_by) $("input:radio[name=" + window.url_param_group_by + "]").prop("checked", true);
 
     $("#checkbox_compare").prop('checked', window.url_param_compare);
@@ -261,12 +273,14 @@ $("document").ready(function() {
     // and build the evaluation results table.
     $("#table_loading").addClass("show");
     read_initial_data().then(function() {
+        set_up_table_filter_multiselects();
         build_evaluation_results_table(true);
     });
 
     // Filter table rows by regex in input field (from SPARQL AC evaluation) on key up
     $experiment_filter.keyup(function() {
-        filter_table_rows();
+        update_multi_select_checkboxes(this);
+        update_experiment_filter($experiment_filter.val())
 
         // Update current URL without refreshing the site
         const url = new URL(window.location);
@@ -276,7 +290,8 @@ $("document").ready(function() {
 
     // Filter results by regex in input field #result-regex on key up
     $benchmark_filter.keyup(function() {
-        filter_table_rows();
+        update_multi_select_checkboxes(this);
+        update_benchmark_filter($benchmark_filter.val())
 
         // Update current URL without refreshing the site
         const url = new URL(window.location);
@@ -284,35 +299,35 @@ $("document").ready(function() {
         window.history.replaceState({}, '', url);
     });
 
-    // Highlight error category cells on hover
-    $evaluation_table_wrapper.on("mouseenter", "td", function() {
-        if (is_error_cell(this)) {
-            $(this).addClass("hovered");
-        }
-    });
-    $evaluation_table_wrapper.on("mouseleave", "td", function() {
-        $(this).removeClass("hovered");
-    });
 
-    // Highlight all cells in a row belonging to the same mention_type or type or the "all" column on hover
+    // Highlight all cells in a row belonging to the same mention_type or type or the "all" column or
+    // an error category cell on hover
     $evaluation_table_wrapper.on("mouseenter", "td", function() {
         if ($(this).attr('class')) {
-            let cls = $(this).attr('class').split(/\s+/)[0];
-            if (cls in MENTION_TYPE_HEADERS || is_type_string(cls) || cls === "all") {
+            const cls = $(this).attr('class').split(/\s+/)[0];
+            const evaluation_category = get_evaluation_category_string(this, true);
+            const base_category = (evaluation_category) ? evaluation_category.split("|")[0] : null;
+            if (base_category === "mention_types" || base_category === "entity_types" || cls === "all") {
                 // Mark all cells in the corresponding row with the corresponding class
                 $(this).closest('tr').find('.' + cls).each(function() {
                     $(this).addClass("hovered");
                 });
+            } else if (base_category === "error_categories") {
+                $(this).addClass("hovered");
             }
         }
     });
     $evaluation_table_wrapper.on("mouseleave", "td", function() {
         if ($(this).attr('class')) {
-            let cls = $(this).attr('class').split(/\s+/)[0];
-            if (cls in MENTION_TYPE_HEADERS || is_type_string(cls) || cls === "all") {
+            const cls = $(this).attr('class').split(/\s+/)[0];
+            const evaluation_category = get_evaluation_category_string(this, true);
+            const base_category = (evaluation_category) ? evaluation_category.split("|")[0] : null;
+            if (base_category === "mention_types" || base_category === "entity_types" || cls === "all") {
                 $(this).closest('tr').find('.' + cls).each(function() {
                     $(this).removeClass("hovered");
                 });
+            } else {
+                $(this).removeClass("hovered");
             }
         }
     });
@@ -339,12 +354,6 @@ $("document").ready(function() {
         });
     });
 
-    // Set the table filter strings and show-deprecated checkbox according to the URL parameters
-    if (window.url_param_experiment_filter) $experiment_filter.val(window.url_param_experiment_filter);
-    if (window.url_param_benchmark_filter) $benchmark_filter.val(window.url_param_benchmark_filter);
-    $("#checkbox_deprecated").prop('checked', window.url_param_show_deprecated);
-    if (window.url_param_experiment_filter || window.url_param_benchmark_filter || !window.url_param_show_deprecated) filter_table_rows();
-
     // Synchronize the top and bottom scrollbar of the evaluation table
     // Prevent double calls to .scroll() by using a flag
     let second_call = false;
@@ -370,8 +379,10 @@ $("document").ready(function() {
     $('table').on('stickyHeadersInit', function() {
         // Add table header tooltips to sticky header
         $("#evaluation_table_wrapper .tablesorter-sticky-wrapper th").each(function() {
-            const keys = get_table_header_keys(this);
-            const tooltiptext = get_th_tooltip_text(keys[0], keys[1]);
+            const evaluation_categories = get_evaluation_category_string(this, false).split("|");
+            const category = (evaluation_categories.length >= 2) ? evaluation_categories[1] : "";
+            const subcategory = (evaluation_categories.length >= 3) ? evaluation_categories[2] : "";
+            const tooltiptext = get_th_tooltip_text(category, subcategory);
             if (tooltiptext) {
                 tippy(this, {
                     content: tooltiptext,
@@ -425,6 +436,13 @@ $("document").ready(function() {
         // to hover effects.
         Chart.getChart('graph_canvas').destroy();
     });
+
+    $(".checkbox_menu").on("change", "input[type='checkbox']", function() {
+        update_filter_regex_from_checkboxes($(this).closest("ul"));
+    });
+    $(document).on('click', '.allow-focus', function (e) {
+        e.stopPropagation();
+    });
 });
 
 
@@ -445,6 +463,8 @@ function read_url_parameters() {
     window.url_param_access = get_url_parameter_string(get_url_parameter("access"));
     window.url_param_evaluation_mode = get_url_parameter_string(get_url_parameter("evaluation_mode"));
     window.url_param_group_by = get_url_parameter_string(get_url_parameter("group_by"));
+    window.url_param_internal_experiment_filter = get_url_parameter_string(get_url_parameter("internal_experiment_filter"));
+    window.url_param_internal_benchmark_filter = get_url_parameter_string(get_url_parameter("internal_benchmark_filter"));
 }
 
 function get_url_parameter(parameter_name) {
@@ -864,20 +884,22 @@ function add_evaluation_table_header(json_obj) {
      * Add html for the table header.
      */
     let first_row = "<tr><th colspan=2></th>";
-    let second_row = "<tr><th>Experiment</th><th>Benchmark</th>";
-    $.each(json_obj, function(key) {
-        $.each(json_obj[key], function(subkey) {
+    let second_row = "<tr><th>System</th><th>Benchmark</th>";
+    $.each(json_obj, function(base_key) {
+        $.each(json_obj[base_key], function(key) {
             let colspan = 0;
-            let class_name = get_class_name(subkey);
-            $.each(json_obj[key][subkey], function(subsubkey) {
-                if (!(IGNORE_HEADERS.includes(subsubkey))) {
-                    let subclass_name = get_class_name(subsubkey);
-                    let sort_order = (subkey in ERROR_CATEGORY_MAPPING) ? " data-sortinitialorder=\"asc\"" : "";
-                    second_row += "<th class='" + class_name + " " + class_name + "-" + subclass_name + " sorter-digit'" + sort_order + ">" + get_checkbox_or_column_title(subkey, subsubkey, false) + "</th>";
+            const class_name = get_class_name(key);
+            $.each(json_obj[base_key][key], function(subkey) {
+                if (!(IGNORE_HEADERS.includes(subkey))) {
+                    const subclass_name = get_class_name(subkey);
+                    const sort_order = (key in ERROR_CATEGORY_MAPPING) ? " data-sortinitialorder=\"asc\"" : "";
+                    const data_string = " data-evaluation_category='" + base_key + "|" + key + "|" + subkey + "' ";
+                    second_row += "<th class='" + class_name + " " + class_name + "-" + subclass_name + " sorter-digit'" + sort_order + data_string + ">" + get_checkbox_or_column_title(key, subkey, false) + "</th>";
                     colspan += 1;
                 }
             });
-            first_row += "<th colspan=\"" + colspan + "\" class='" + class_name + "'>" + get_checkbox_or_column_title(key, subkey, false) + "</th>";
+            const data_string = " data-evaluation_category='" + base_key + "|" + key + "' ";
+            first_row += "<th colspan=\"" + colspan + "\" class='" + class_name  + "'" + data_string + ">" + get_checkbox_or_column_title(base_key, key, false) + "</th>";
         });
     });
     first_row += "</tr>";
@@ -886,8 +908,10 @@ function add_evaluation_table_header(json_obj) {
 
     // Add table header tooltips
     $("#evaluation_table_wrapper th").each(function() {
-        let keys = get_table_header_keys(this);
-        let tooltiptext = get_th_tooltip_text(keys[0], keys[1]);
+        const evaluation_categories = get_evaluation_category_string(this, false).split("|");
+        const category = (evaluation_categories.length >= 2) ? evaluation_categories[1] : "";
+        const subcategory = (evaluation_categories.length >= 3) ? evaluation_categories[2] : "";
+        const tooltiptext = get_th_tooltip_text(category, subcategory);
         if (tooltiptext) {
             tippy(this, {
                 content: tooltiptext,
@@ -990,7 +1014,7 @@ function get_table_row(experiment_id, json_obj) {
                         value = processed_value;
                     }
                     let subclass_name = get_class_name(subkey);
-                    let data_string = "data-category='" + class_name + "," + subclass_name + "'";
+                    let data_string = "data-evaluation_category='" + basekey + "|" + key + "|" + subkey + "' ";
                     row += "<td class='" + class_name + " " + class_name + "-" + subclass_name + "' " + data_string + onclick_str + ">" + value + "</td>";
                 }
             });
@@ -1017,14 +1041,12 @@ function filter_table_rows() {
      * Filter table rows according to the experiment and benchmark filters.
      * Also filter table rows according to whether the show-deprecated checkbox is checked.
      */
-    let experiment_keywords = $.trim($("input#experiment-filter").val()).split(/\s+/);
-    let benchmark_keywords = $.trim($("input#benchmark-filter").val()).split(/\s+/);
     $("#evaluation_table_wrapper tbody tr").each(function() {
         let name = $(this).children("td:nth-child(1)").text();
         let benchmark = $(this).children("td:nth-child(2)").text();
         // Filter row according to filter keywords
-        let show_row = experiment_keywords.every(keyword => name.search(keyword) !== -1);
-        show_row &= benchmark_keywords.every(keyword => benchmark.search(keyword) !== -1);
+        let show_row = name.search(window.internal_experiment_filter) !== -1;
+        show_row &= benchmark.search(window.internal_benchmark_filter) !== -1;
 
         // Filter row according to show-deprecated checkbox
         if (!$("#checkbox_deprecated").is(":checked")) {
@@ -1182,17 +1204,21 @@ function on_cell_click(el) {
     }
 
     // Make new selection
-    let classes = ($(el).attr('class')) ? $(el).attr('class').split(/\s+/) : [];  // Experiment column has no class attribute
-    if (is_error_cell(el)) {
+    const evaluation_categories = get_evaluation_category_string(el, true);
+    const base_category = (evaluation_categories) ? evaluation_categories.split("|")[0] : null;
+    if (base_category === "error_categories") {
+        // Mark just the clicked cell as selected
         $(el).addClass("selected");
         window.selected_cells.push(el);
-    } else if (classes.length > 0 && (classes[0] in MENTION_TYPE_HEADERS || is_type_string(classes[0]))) {
+    } else if (base_category === "entity_types" || base_category === "mention_types") {
+        // Mark all three cells belonging to the same column as selected
+        const classes = $(el).attr('class').split(/\s+/);
         $(el).closest('tr').find('.' + classes[0]).each(function() {
             $(this).addClass("selected");
         });
         window.selected_cells.push(el);
     } else {
-        // Select "all" column
+        // Select all three cells of the "all" column when clicking on System, Benchmark or NER column
         let added = false;
         $(el).closest('tr').find('.all').each(function() {
             $(this).addClass("selected");
@@ -1207,7 +1233,7 @@ function on_cell_click(el) {
     // Updated selected cell categories
     // Note that selected_rows is updated in on_row_click(), i.e. after on_cell_click() is called so no -1 necessary.
     let exp_index = (already_selected_row_clicked >= 0 || !is_compare_checked()) ? 0 : window.selected_rows.length % MAX_SELECTED_APPROACHES;
-    window.selected_cell_categories[exp_index] = get_error_category_or_type(el);
+    window.selected_cell_categories[exp_index] = evaluation_categories;
 
     // Update current URL without refreshing the site
     const url = new URL(window.location);
@@ -1338,6 +1364,7 @@ function get_th_tooltip_text(key, subkey) {
      * Get the tooltip text (including html) for the table header cell specified by the
      * given evaluation results key and subkey.
      */
+    if (!key) return "";
     if (key.toLowerCase() in HEADER_DESCRIPTIONS) {
         key = key.toLowerCase();
         subkey = subkey.toLowerCase();
@@ -1368,8 +1395,7 @@ function get_th_tooltip_text(key, subkey) {
             }
             return string;
         }
-    } else if (key.toUpperCase() in window.whitelist_types || key.toLowerCase() === "other") {
-        key = key.toUpperCase();
+    } else if (key in window.whitelist_types || key.toLowerCase() === "other") {
         const type = (key in window.whitelist_types) ? window.whitelist_types[key] : "Other";
         if (subkey) {
             // Get tooltips for precision, recall and f1
@@ -1569,30 +1595,33 @@ function show_example_benchmark_modal(el) {
      */
     // Get example error category of the table tooltip to highlight only corresponding mentions
     // Hack to get the reference object from the clicked tippy tooltip.
-    let table_header_cell = $(el).parent().parent().parent().parent()[0]._tippy.reference;
-    let selected_category = get_error_category_or_type(table_header_cell);
+    const table_header_cell = $(el).parent().parent().parent().parent()[0]._tippy.reference;
+    const selected_category = get_evaluation_category_string(table_header_cell, true);
 
     // Get table header title
-    let keys = get_table_header_keys(table_header_cell);
-    let error_category_title = keys[0].replace(/_/g, " ") + " - " + keys[1].replace(/_/g, " ");
+    const evaluation_categories = get_evaluation_category_string(table_header_cell, false).split("|");
+    const category = evaluation_categories[1];
+    const subcategory = evaluation_categories[2];
+    let error_category_title = category + " - " + subcategory;
+    error_category_title = error_category_title.replace(/_/g, " ");
 
     // Determine article index of selected example
     let article_index = 0;
     for (let i=0; i<window.articles_example_benchmark.length; i++) {
         let article = window.articles_example_benchmark[i];
-        if (article.title.toLowerCase().includes(error_category_title)) {
+        if (article.title.toLowerCase().includes(error_category_title.toLowerCase())) {
             article_index = i;
             break;
         }
     }
 
     // Display error explanation extracted from table header tooltip text
-    let error_explanation = HEADER_DESCRIPTIONS[keys[0]][keys[1]];
+    let error_explanation = HEADER_DESCRIPTIONS[category][subcategory];
     error_explanation = error_explanation.replace(/.*<i>Numerator:<\/i> (.*?)<\/p>.*/, "$1");
     $("#error_explanation").text("Description: " + error_explanation);
     // Display annotated text
-    let textfield = $("#example_prediction_overview tr td");
-    show_annotated_text("example.error-category-examples", $(textfield[0]), selected_category, 100, article_index);
+    const textfield = $("#example_prediction_overview tr td");
+    show_annotated_text("example.error-category-examples", $(textfield[0]), selected_category, 100, article_index, true);
     $("#example_prediction_overview tr th").text(window.articles_example_benchmark[article_index].title);
 }
 
@@ -1601,19 +1630,18 @@ function show_example_benchmark_modal(el) {
  Functions for DISPLAYING ANNOTATED ARTICLES
  *********************************************************************************************************************/
 
-function show_annotated_text(experiment_id, textfield, selected_cell_category, column_idx, article_index) {
+function show_annotated_text(experiment_id, textfield, selected_cell_category, column_idx, article_index, example_modal) {
     /*
      * Generate annotations and tooltips for predicted and ground truth mentions of the selected experiment
      * and article and show them in the textfield.
      */
     let benchmark = get_benchmark_from_experiment_id(experiment_id);
-    let example_benchmark = is_example_benchmark(benchmark);
-    let articles = (example_benchmark) ? window.articles_example_benchmark : window.benchmark_articles[benchmark];
+    let articles = (example_modal) ? window.articles_example_benchmark : window.benchmark_articles[benchmark];
     let annotated_text = "";
-    if (window.is_show_all_articles && !example_benchmark) {
+    if (window.is_show_all_articles && !example_modal) {
         let annotated_texts = [];
         for (let i=0; i < articles.length; i++) {
-            let annotations = get_annotations(i, experiment_id, benchmark, column_idx);
+            let annotations = get_annotations(i, experiment_id, benchmark, column_idx, example_modal);
             annotated_texts.push(annotate_text(articles[i].text,
                                                annotations,
                                                articles[i].hyperlinks,
@@ -1628,13 +1656,13 @@ function show_annotated_text(experiment_id, textfield, selected_cell_category, c
         }
     } else {
         let curr_article = articles[article_index];
-        let annotations = get_annotations(article_index, experiment_id, benchmark, column_idx);
+        let annotations = get_annotations(article_index, experiment_id, benchmark, column_idx, example_modal);
         annotated_text = annotate_text(curr_article.text, annotations, curr_article.hyperlinks, [0, curr_article.text.length], selected_cell_category);
     }
     textfield.html(annotated_text);
 }
 
-function get_annotations(article_index, experiment_id, benchmark, column_idx) {
+function get_annotations(article_index, experiment_id, benchmark, column_idx, example_modal) {
     /*
      * Generate annotations for the predicted entities of the selected experiment and article.
      *
@@ -1643,10 +1671,9 @@ function get_annotations(article_index, experiment_id, benchmark, column_idx) {
      * and then generates annotations for all of them.
      */
     let eval_mode;
-    let example_benchmark = is_example_benchmark(benchmark);
     let article_cases;
     let article_data;
-    if (example_benchmark) {
+    if (example_modal) {
         eval_mode = "IGNORED";
         article_cases = window.evaluation_cases_example_benchmark[article_index];
     } else {
@@ -1779,7 +1806,7 @@ function get_annotations(article_index, experiment_id, benchmark, column_idx) {
                 // Get text of parent span
                 if (curr_label_id !== mention.true_entity.id) {
                     let parent_span = label_id_to_label[curr_label_id].span;
-                    const articles = (example_benchmark) ? window.articles_example_benchmark : window.benchmark_articles[benchmark];
+                    const articles = (example_modal) ? window.articles_example_benchmark : window.benchmark_articles[benchmark];
                     gt_annotation.parent_text = articles[article_index].text.substring(parent_span[0], parent_span[1]);
                 }
                 gt_annotation.gt_entity_id = mention.true_entity.entity_id;
@@ -1939,8 +1966,7 @@ function generate_annotation_html(snippet, annotation, selected_cell_category) {
     let tooltip_body_text = "";
     let tooltip_footer_html = "";
     if (annotation.class === ANNOTATION_CLASS_TP && annotation.pred_entity_id) {
-        const wikidata_url = "https://www.wikidata.org/wiki/" + annotation.pred_entity_id;
-        const entity_link = "<a href=\"" + wikidata_url + "\" target=\"_blank\">" + annotation.pred_entity_id + "</a>";
+        const entity_link = get_entity_link(annotation.pred_entity_id);
         let entity_name;
         if (annotation.pred_entity_name != null) {
             entity_name = (["Unknown", "null"].includes(annotation.pred_entity_name)) ? MISSING_LABEL_TEXT : annotation.pred_entity_name;
@@ -1955,8 +1981,7 @@ function generate_annotation_html(snippet, annotation, selected_cell_category) {
         if ("pred_entity_id" in annotation) {
             if (annotation.pred_entity_id) {
                 let entity_name = (["Unknown", "null"].includes(annotation.pred_entity_name)) ? MISSING_LABEL_TEXT : annotation.pred_entity_name;
-                const wikidata_url = "https://www.wikidata.org/wiki/" + annotation.pred_entity_id;
-                const entity_link = "<a href=\"" + wikidata_url + "\" target=\"_blank\">" + annotation.pred_entity_id + "</a>";
+                const entity_link = get_entity_link(annotation.pred_entity_id);
                 tooltip_header_text += "Prediction: " + entity_name + " (" + entity_link + ")";
             } else {
                 // NIL prediction
@@ -1977,8 +2002,7 @@ function generate_annotation_html(snippet, annotation, selected_cell_category) {
                 tooltip_header_text += "Groundtruth: [" + entity_name + "]";
             } else {
                 let entity_name = (annotation.gt_entity_name === "Unknown") ? MISSING_LABEL_TEXT : annotation.gt_entity_name;
-                const wikidata_url = "https://www.wikidata.org/wiki/" + annotation.gt_entity_id;
-                const entity_link = "<a href=\"" + wikidata_url + "\" target=\"_blank\">" + annotation.gt_entity_id + "</a>";
+                const entity_link = get_entity_link(annotation.gt_entity_id);
                 tooltip_header_text += "Groundtruth: " + entity_name + " (" + entity_link + ")";
             }
             if (annotation.class === ANNOTATION_CLASS_OPTIONAL) tooltip_body_text += "Note: Detection is optional<br>";
@@ -2026,16 +2050,20 @@ function generate_annotation_html(snippet, annotation, selected_cell_category) {
     let lowlight_mention = false;
     if (selected_cell_category) {
         lowlight_mention = true;
-        for (const selected_category of selected_cell_category) {
-            if (is_type_string(selected_category)) {
-                const pred_type_selected = annotation.pred_entity_type && annotation.pred_entity_type.toLowerCase().split("|").includes(selected_category);
-                const gt_type_selected = annotation.gt_entity_type && annotation.gt_entity_type.toLowerCase().split("|").includes(selected_category);
+        const evaluation_category_tags = get_evaluation_category_tags(selected_cell_category)
+        const base_category = selected_cell_category.split("|")[0];
+        for (const tag of evaluation_category_tags) {
+            if (base_category === "entity_types") {
+                // Selected evaluation category is an entity type
+                const pred_type_selected = annotation.pred_entity_type && annotation.pred_entity_type.split("|").includes(tag);
+                const gt_type_selected = annotation.gt_entity_type && annotation.gt_entity_type.split("|").includes(tag);
                 if (pred_type_selected || gt_type_selected) {
                     lowlight_mention = false;
                     break;
                 }
             } else {
-                if ((annotation.error_labels && annotation.error_labels.includes(selected_category)) || annotation.mention_type === selected_category) {
+                // Selected evaluation category is an error category or a mention type
+                if ((annotation.error_labels && annotation.error_labels.includes(tag)) || annotation.mention_type === tag) {
                     lowlight_mention = false;
                     break;
                 }
@@ -2063,6 +2091,20 @@ function generate_annotation_html(snippet, annotation, selected_cell_category) {
     replacement += "</span>";
 
     return replacement;
+}
+
+function get_entity_link(entity_id) {
+    /*
+     * Retrieve the http link of an entity given its ID depending on whether it's a Wikidata QID or
+     * an ID from a custom ontology.
+     */
+    if (entity_id.match(/[Qq][0-9]+/)) {
+        // Add Wikidata web prefix only if entity ID is a QID (could also be a custom ontology ID)
+        const wikidata_url = "https://www.wikidata.org/wiki/" + entity_id;
+        return "<a href=\"" + wikidata_url + "\" target=\"_blank\">" + entity_id + "</a>";
+    } else {
+        return "<a href=\"" + entity_id + "\" target=\"_blank\">" + entity_id + "</a>";
+    }
 }
 
 function combine_overlapping_annotations(list1, list2) {
@@ -2202,7 +2244,7 @@ async function show_article(selected_exp_ids, timestamp) {
 
     // Show columns
     // Show first prediction column
-    show_annotated_text(selected_exp_ids[0], $(columns[column_idx]), window.selected_cell_categories[0], column_idx, selected_article_index);
+    show_annotated_text(selected_exp_ids[0], $(columns[column_idx]), window.selected_cell_categories[0], column_idx, selected_article_index, false);
     let displayed_exp_name = get_displayed_experiment_name(selected_exp_ids[0]);
     let benchmark_name = get_displayed_benchmark_name(selected_exp_ids[0]);
     let emphasis_str = get_emphasis_string(window.selected_cell_categories[0]);
@@ -2211,7 +2253,7 @@ async function show_article(selected_exp_ids, timestamp) {
     column_idx++;
     if(is_compare_checked() && selected_exp_ids.length > 1) {
         // Show second prediction column
-        show_annotated_text(selected_exp_ids[1], $(columns[column_idx]), window.selected_cell_categories[1], column_idx, selected_article_index);
+        show_annotated_text(selected_exp_ids[1], $(columns[column_idx]), window.selected_cell_categories[1], column_idx, selected_article_index, false);
         displayed_exp_name = get_displayed_experiment_name(selected_exp_ids[1]);
         emphasis_str = get_emphasis_string(window.selected_cell_categories[1])
         $(column_headers[column_idx]).html(displayed_exp_name + "<span class='nonbold'> on " + benchmark_name + emphasis_str + "</span>");
@@ -2238,15 +2280,18 @@ function get_emphasis_string(selected_cell_category) {
      */
     let emphasis = "All";
     if (selected_cell_category) {
-        let emphasis_strs = [];
-        for (const selected_category of selected_cell_category) {
-            if (is_type_string(selected_category)) {
-                emphasis_strs.push("Entity Type: " + get_type_label(selected_category));
-            } else {
-                emphasis_strs.push(to_title_case(selected_category.toLowerCase().replace(/_/g, " ")));
-            }
+        const evaluation_categories = selected_cell_category.split("|");
+        const base_category = evaluation_categories[0];
+        const category = evaluation_categories[1];
+        const subcategory = evaluation_categories[2];
+        if (base_category === "entity_types") {
+            emphasis = "Entity Type: " + get_type_label(category);
+        } else if (base_category === "error_categories") {
+            emphasis = "Error Category: " + window.EVALUATION_CATEGORY_TITLES[base_category][category]["table_heading"]
+                                          + " - " + to_title_case(subcategory.replace(/_/g, " "));
+        } else if (base_category === "mention_types") {
+            emphasis = "Mention Type: " + window.EVALUATION_CATEGORY_TITLES[base_category][category]["table_heading"];
         }
-        emphasis = emphasis_strs.join(", ");
     }
     return " (emphasis: \"" + emphasis + "\")";
 }
@@ -2476,8 +2521,8 @@ function copy_table() {
     }
 
     // Copy the table text to the clipboard
-    const $copy_table_text_div = $("#evaluation_overview .copy_table_text");
-    const $copy_table_textarea = $("#evaluation_overview .copy_table_text textarea");
+    const $copy_table_text_div = $("#copy_table_text");
+    const $copy_table_textarea = $("#copy_table_text textarea");
     $copy_table_text_div.show();
     $copy_table_textarea.val(table_text);
     $copy_table_textarea.show();  // Text is not selected or copied if it is hidden
@@ -2504,7 +2549,7 @@ function get_table_contents(include_benchmark, include_experiment) {
         let table_row_contents = [];
         $(this).find('th').each(function() {
             if (!include_benchmark && $(this).text() === "Benchmark") return;
-            if (!include_experiment && $(this).text() === "Experiment") return;
+            if (!include_experiment && $(this).text() === "System") return;
             // Do not add hidden table columns
             if (!$(this).is(":hidden")) {
                 if (row_index > 0) num_cols += 1;
@@ -2577,7 +2622,7 @@ function produce_latex(table_contents, n_cols, include_experiment, include_bench
         for (let cell of row) {
             if (cell[2]) {
                 // Cell is a header_cell
-                alignment = (["Experiment", "Benchmark"].includes(cell[0])) ? "l" : "c";
+                alignment = (["System", "Benchmark"].includes(cell[0])) ? "l" : "c";
                 latex_string += "\\multicolumn{" + cell[1] + "}{" + alignment + "}{\\textbf{" + cell[0] + "}}";
                 last_cell_is_header = true;
             } else {
@@ -2642,7 +2687,6 @@ function graph_mode_on() {
      * a table column.
      */
     const $evaluation_table_wrapper = $("#evaluation_table_wrapper");
-
     $("#overlay").show();
     $("#overlay_footer").show();
 
@@ -2935,32 +2979,140 @@ function toggle_show_deprecated() {
 }
 
 /**********************************************************************************************************************
- Functions for MINI UTILS
+ Functions for MULTISELECT DROPDOWN
  *********************************************************************************************************************/
 
-function get_table_header_keys(th_element) {
+function set_up_table_filter_multiselects() {
     /*
-     * Get keys for table headers.
-     * For the first table header row this is a single key, e.g. "entity_named".
-     * For the second table header row this is two keys, e.g. "entity_named" and "precision".
+     * Add experiment and benchmark checkboxes to the experiment and benchmark
+     * dropdown multi-select.
      */
-    let keys = ["", ""];
-    const all_classes_string = $(th_element).attr('class');
-    // Experiment column has no attribute 'class'
-    if (all_classes_string) {
-        const all_classes = all_classes_string.split(/\s+/);
-        if (all_classes.length > 1) {
-            // Second table header row
-            const classes = all_classes[1].split("-");
-            keys[0] = classes[0];
-            keys[1] = classes[1]
-        } else if (all_classes.length === 1) {
-            // First table header row
-            keys[0] = all_classes[0];
-        }
+    let experiment_names = new Set();
+    let benchmark_names = new Set();
+    for (let result of window.evaluation_results) {
+        const experiment_id = result[0];
+        const experiment_name = get_displayed_experiment_name(experiment_id);
+        experiment_names.add(experiment_name);
+        const benchmark_name = get_displayed_benchmark_name(experiment_id);
+        benchmark_names.add(benchmark_name);
     }
-    return keys;
+    experiment_names = Array.from(experiment_names).sort();
+    benchmark_names = Array.from(benchmark_names).sort();
+
+    for (let experiment_name of experiment_names) {
+        const checked = (experiment_name.search(window.internal_experiment_filter) !== -1) ? "checked" : "";
+        const option = "<li><label><input type=\"checkbox\" value='" + experiment_name + "' " + checked + ">" + experiment_name + "</label></li>";
+        $("#experiment_select").append(option);
+    }
+    for (let benchmark_name of benchmark_names) {
+        const checked = (benchmark_name.search(window.internal_benchmark_filter) !== -1) ? "checked" : "";
+        const option = "<li><label><input type=\"checkbox\" value='" + benchmark_name + "' " + checked + ">" + benchmark_name + "</label></li>";
+        $("#benchmark_select").append(option);
+    }
 }
+
+function toggle_dropdown_multi_select(el) {
+    /*
+     * Toggle all checkboxes in the dropdown menu in which the toggle button
+     * (el) was pressed.
+     * If all checkboxes are deselected, select all, in any other case deselect
+     * all checkboxes.
+     */
+    const $closest_ul = $(el).closest("ul");
+    const $all_checkboxes = $closest_ul.find("input[type='checkbox']");
+    const checked = $all_checkboxes.filter(":checked").length === 0;
+    $all_checkboxes.prop('checked', checked);
+    update_filter_regex_from_checkboxes($closest_ul);
+}
+
+function update_multi_select_checkboxes(el) {
+    /*
+     * Update the checkboxes in the multi-select dropdown menu according to the
+     * given filter text input field. That is, select exactly those checkboxes
+     * whose values match the filter regex in the text input field.
+     */
+    const $closest_ul = $(el).closest("ul");
+
+    let regex = $(el).val();
+    regex = new RegExp(regex, "i");
+
+    $closest_ul.find("input[type='checkbox']").each(function() {
+        // Set the checkbox to check if it matches the regex
+        $(this).prop('checked', $(this).val().search(regex) !== -1);
+    });
+}
+
+function update_filter_regex_from_checkboxes(el) {
+    /*
+     * Update the internal filter regex according to the checkboxes checked in
+     * the given multi-select dropdown menu.
+     */
+    const select_id = $(el).prop("id");
+    let keywords = [];
+    $("#" + select_id + " input[type='checkbox']:checked").each(function() {
+        const regex = "^" + escape_regex($(this).val()) + "$";
+        keywords.push(regex);
+    });
+    let filter_regex = keywords.join("|");
+    // If all checkboxes are deselected, filter_regex is the empty string and
+    // when converted to a regular expression, matches everything. Make sure
+    // the regex in that case matches only the empty string.
+    if (filter_regex === "") filter_regex = "^$";
+
+    if (select_id === "experiment_select") {
+        // $("#experiment-filter").val(filter_regex);
+        update_experiment_filter(filter_regex);
+    } else {
+        // $("#benchmark-filter").val(filter_regex);
+        update_benchmark_filter(filter_regex);
+    }
+}
+
+function update_experiment_filter(regex) {
+    /*
+     * Update the internal experiment filter regex and filter the table rows
+     * accordingly.
+     */
+    window.internal_experiment_filter = new RegExp(regex, "i");
+    filter_table_rows();
+
+    // Update current URL without refreshing the site
+    const url = new URL(window.location);
+    if ($("#experiment_select input[type='checkbox']").filter(":not(:checked)").length === 0 ) {
+        // If all checkboxes are checked, the URL parameter is not necessary,
+        // since this is the default anyway. Therefore, delete it to avoid an
+        // endless long URL.
+        url.searchParams.delete('internal_experiment_filter');
+    } else {
+        url.searchParams.set('internal_experiment_filter', regex);
+    }
+    window.history.replaceState({}, '', url);
+}
+
+function update_benchmark_filter(regex) {
+    /*
+     * Update the internal benchmark filter regex and filter the table rows
+     * accordingly.
+     */
+    window.internal_benchmark_filter = new RegExp(regex, "i");
+    filter_table_rows();
+
+    // Update current URL without refreshing the site
+    const url = new URL(window.location);
+    if ($("#benchmark_select input[type='checkbox']").filter(":not(:checked)").length === 0 ) {
+        // If all checkboxes are checked, the URL parameter is not necessary,
+        // since this is the default anyway. Therefore, delete it to avoid an
+        // endless long URL.
+        url.searchParams.delete('internal_benchmark_filter');
+    } else {
+        url.searchParams.set('internal_benchmark_filter', regex);
+    }
+    window.history.replaceState({}, '', url);
+}
+
+/**********************************************************************************************************************
+ Functions for MINI UTILS
+ *********************************************************************************************************************/
 
 function show_table_column(table_id, index) {
     /*
@@ -2978,58 +3130,43 @@ function hide_table_column(table_id, index) {
     $("#" + table_id + " td:nth-child(" + (index + 1) + ")").hide();
 }
 
-function is_error_cell(el) {
-    /*
-     * Return true if the given cell is a error category td.
-     */
-    if ($(el).attr('class')) {  // Experiment column has no class attribute
-        const classes = $(el).attr('class').split(/\s+/);
-        if (classes.length > 1) {
-            // The second class of a cell is its header and subheader (as class name) connected by "-"
-            const keys = classes[1].split("-");
-            if (keys[0] in ERROR_CATEGORY_MAPPING) {
-                if (keys[1] in ERROR_CATEGORY_MAPPING[keys[0]]) {
-                    return true;
-                }
-            }
+function get_evaluation_category_string(el, only_if_annotation_filter) {
+    const evaluation_category_data = $(el).data("evaluation_category");
+    if (evaluation_category_data) {
+        if (!only_if_annotation_filter || (evaluation_category_data.split("|")[1].toLowerCase() !== "all"
+                                           && evaluation_category_data.split("|")[1].toLowerCase() !== "ner")) {
+            return evaluation_category_data;
         }
     }
-    return false;
+    return "";
 }
 
-function get_error_category_or_type(el) {
+function get_evaluation_category_tags(evaluation_category_string) {
     /*
-     * For a given cell return the error category or type it belongs to, or null otherwise.
+     * For a given cell return the error category, entity type or mention type tag.
      */
-    if ($(el).attr('class')) {
-        const classes = $(el).attr('class').split(/\s+/);
-        if (is_error_cell(el)) {
-            const keys = classes[1].split("-");
-            return ERROR_CATEGORY_MAPPING[keys[0]][keys[1]];
-        } if (is_type_string(classes[0])) {
-            return [get_type_qid(classes[0])];
-        } else if (classes[0] in MENTION_TYPE_HEADERS) {
-            return MENTION_TYPE_HEADERS[classes[0]];
+    if (evaluation_category_string) {
+        const evaluation_categories = evaluation_category_string.split("|");
+        const base_category = evaluation_categories[0];
+        const category = evaluation_categories[1];
+        const subcategory = evaluation_categories[2];
+        if (base_category === "error_categories") {
+            return ERROR_CATEGORY_MAPPING[category][subcategory];
+        } else if (base_category === "entity_types") {
+            return [category];
+        } else if (base_category === "mention_types") {
+            return MENTION_TYPE_HEADERS[category];
         }
     }
     return null;
-}
-
-function is_type_string(class_name) {
-    const match = class_name.match(/[Qq][0-9]+.*/);
-    if (match || class_name === "other") {
-        return true;
-    }
-}
-
-function get_type_qid(string) {
-    return string.replace(/([Qq][0-9]+).*/, "$1");
 }
 
 function get_type_label(qid) {
     const qid_upper = qid.replace("q", "Q");
     if (qid_upper in window.whitelist_types) {
         return window.whitelist_types[qid_upper];
+    } else if (qid in window.whitelist_types) {
+        return window.whitelist_types[qid]
     } else if (qid.toLowerCase() === "other") {
         return "Other";
     }
@@ -3037,9 +3174,7 @@ function get_type_label(qid) {
 }
 
 function get_class_name(text) {
-    const name = text.toLowerCase().replace(/[ ,.#:]/g, "_");
-    if (name !== text.toLowerCase()) console.log("WARNING! Class name is not identical to key: " + name + " vs. " + text);
-    return name;
+    return text.toLowerCase().replace(/[ ,.#:\/]/g, "_");
 }
 
 function to_title_case(str) {
@@ -3054,8 +3189,8 @@ function get_checkbox_or_column_title(key, subkey, is_checkbox) {
      */
     const lower_key = key.toLowerCase();
     const lower_subkey = subkey.toLowerCase();
-    if (key === "entity_types" && is_type_string(lower_subkey)) {
-        return (is_checkbox) ? get_type_label(lower_subkey) : "Type: " + get_type_label(lower_subkey);
+    if (key === "entity_types") {
+        return (is_checkbox) ? get_type_label(subkey) : "Type: " + get_type_label(subkey);
     } else if (lower_key in EVALUATION_CATEGORY_TITLES && lower_subkey in EVALUATION_CATEGORY_TITLES[lower_key]) {
         const last_key = (is_checkbox) ? "checkbox_label" : "table_heading";
         return EVALUATION_CATEGORY_TITLES[lower_key][lower_subkey][last_key];
@@ -3069,26 +3204,19 @@ function get_full_category_title_for_column(el) {
      * For a given table cell (not from the first table header row) get the
      * full category title, e.g. "NER: Precision" or "NER FP: Lowercased"
      */
-    const keys = get_table_header_keys(el);
-    return get_full_category_title_for_keys(keys[0], keys[1]);
-}
-
-function get_full_category_title_for_keys(key, subkey) {
-    /*
-     * For a given key and subkey of a table cell (not from the first table header row) get the
-     * full category title, e.g. "NER: Precision" or "NER FP: Lowercased"
-     */
+    const evaluation_category_string = get_evaluation_category_string(el, false).split("|");
+    const base_category = evaluation_category_string[0];
+    const category = evaluation_category_string[1];
+    const subcategory = evaluation_category_string[2];
     let title = "";
-    if (key in window.EVALUATION_CATEGORY_TITLES["mention_types"]) {
-        title += window.EVALUATION_CATEGORY_TITLES["mention_types"][key]["table_heading"];
-    } else if (key in window.EVALUATION_CATEGORY_TITLES["error_categories"]) {
-        title += window.EVALUATION_CATEGORY_TITLES["error_categories"][key]["table_heading"];
-    } else if (is_type_string(key)) {
-        title += "Type: " + get_type_label(key);
+    if (base_category === "mention_types" || base_category === "error_categories") {
+        title += window.EVALUATION_CATEGORY_TITLES[base_category][category]["table_heading"];
+    } else if (base_category === "entity_types") {
+        title += "Type: " + get_type_label(category);
     } else {
-        title += to_title_case(key.replace(/_/g, " "));
+        title += to_title_case(category.replace(/_/g, " "));
     }
-    title += " - " + to_title_case(subkey.replace(/_/g, " "));
+    title += " - " + to_title_case(subcategory.replace(/_/g, " "));
     return title;
 }
 
@@ -3113,10 +3241,6 @@ function set_top_scrollbar_width() {
      */
     let width = $("#evaluation_table_wrapper table")[0].getBoundingClientRect().width + 20;  // + width of the side scrollbar
     $("#top_scrollbar").css({"width": width + "px"});
-}
-
-function is_example_benchmark(benchmark) {
-    return benchmark === EXAMPLE_BENCHMARK_PATH.split("/")[1].replace(".benchmark.jsonl", "");
 }
 
 function is_compare_checked() {
@@ -3175,4 +3299,12 @@ function is_unique(value, index, self) {
      * See: https://stackoverflow.com/questions/1960473/get-all-unique-values-in-a-javascript-array-remove-duplicates
      */
     return self.indexOf(value) === index;
+}
+
+function escape_regex(string) {
+    /*
+     * Escape a given plain string such that a regex created from the escaped string will match the given string.
+     * See https://stackoverflow.com/questions/3561493/is-there-a-regexp-escape-function-in-javascript/3561711#3561711
+     */
+    return string.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
 }

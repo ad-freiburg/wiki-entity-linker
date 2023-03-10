@@ -23,28 +23,6 @@ from src.evaluation.evaluator import Evaluator
 def main(args):
     logger.info("Evaluating linking results from %s ..." % args.input_files)
 
-    # Get a set of entity ids of all predicted entities and candidate entities
-    # to load their information into the entity_db
-    # (all necessary information about ground truth labels is already contained in the benchmark jsonl file)
-    logger.info("Extracting relevant entities (predicted entities, candidates and "
-                "groundtruth entities if a type mapping is given) ...")
-    relevant_entity_ids = set()
-    for input_file in args.input_files:
-        with open(input_file, 'r', encoding='utf8') as file:
-            for line in file:
-                article = article_from_json(line)
-                for em in article.entity_mentions.values():
-                    relevant_entity_ids.add(em.entity_id)
-                    relevant_entity_ids.update(em.candidates)
-                if args.type_mapping and not args.benchmark:
-                    # If a type mapping other than the default mapping is used, ground truth labels must be re-annotated
-                    for gt_label in article.labels:
-                        relevant_entity_ids.add(gt_label.entity_id)
-    if args.type_mapping and args.benchmark:
-        for article in get_benchmark_iterator(args.benchmark).iterate():
-            for gt_label in article.labels:
-                relevant_entity_ids.add(gt_label.entity_id)
-
     # Read whitelist types
     whitelist_types = set()
     if args.type_whitelist:
@@ -55,10 +33,15 @@ def main(args):
                     typ = type_match.group(0)
                     whitelist_types.add(typ)
 
-    whitelist_file = args.type_whitelist if args.type_whitelist else settings.WHITELIST_FILE
-    type_mapping_file = args.type_mapping if args.type_mapping else settings.WHITELIST_TYPE_MAPPING
-    evaluator = Evaluator(relevant_entity_ids, type_mapping_file, whitelist_file=whitelist_file,
-                          contains_unknowns=not args.no_unknowns)
+    whitelist_file = settings.WHITELIST_FILE
+    if args.type_whitelist:
+        whitelist_file = args.type_whitelist
+    elif args.custom_mappings:
+        whitelist_file = settings.CUSTOM_WHITELIST_TYPES_FILE
+
+    type_mapping_file = args.type_mapping if args.type_mapping else settings.QID_TO_WHITELIST_TYPES_DB
+    evaluator = Evaluator(type_mapping_file, whitelist_file=whitelist_file, contains_unknowns=not args.no_unknowns,
+                          custom_mappings=args.custom_mappings)
 
     for input_file_name in args.input_files:
         idx = input_file_name.rfind('.linked_articles.jsonl')
@@ -86,9 +69,8 @@ def main(args):
             if args.type_mapping:
                 # Map benchmark label entities to types in the mapping
                 for gt_label in article.labels:
-                    entity = evaluator.entity_db.get_entity(gt_label.entity_id)
-                    if entity:  # Should be None only if label is a Unknown, but for some reason it doesn't happen
-                        gt_label.type = entity.type
+                    types = evaluator.entity_db.get_entity_types(gt_label.entity_id)
+                    gt_label.type = types.join("|")
 
             if whitelist_types:
                 # Ignore groundtruth labels that do not have a type that is included in the whitelist
@@ -114,7 +96,7 @@ def main(args):
                 filtered_entity_mentions = {}
                 if args.type_filter_predictions:
                     for span, em in article.entity_mentions.items():
-                        types = evaluator.entity_db.get_entity(em.entity_id).get_types()
+                        types = evaluator.entity_db.get_entity_types(em.entity_id)
                         for typ in types:
                             if typ in whitelist_types:
                                 filtered_entity_mentions[span] = em
@@ -157,7 +139,7 @@ if __name__ == "__main__":
                                      description=__doc__)
 
     parser.add_argument("input_files", type=str, nargs='+',
-                        help="Input file. Linked articles with ground truth labels.")
+                        help="Input file(s). Linked articles with ground truth labels.")
     parser.add_argument("-o", "--output_file", type=str,
                         help="Output file for the evaluation results."
                              " The input file with .eval_cases.jsonl extension if none is specified.")
@@ -179,6 +161,8 @@ if __name__ == "__main__":
     parser.add_argument("--type_filter_predictions", action="store_true",
                         help="Ignore predicted links that do not have a type from the type whitelist."
                              "This has no effect if the type_whitelist argument is not provided.")
+    parser.add_argument("-c", "--custom_mappings", action="store_true",
+                        help="Use custom entity to name and entity to type mappings instead of Wikidata.")
 
     logger = log.setup_logger(sys.argv[0])
     logger.debug(' '.join(sys.argv))

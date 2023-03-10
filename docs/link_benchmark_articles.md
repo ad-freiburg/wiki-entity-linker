@@ -14,7 +14,8 @@ Properties specific to the selected linker such as confidence thresholds, model 
 Additionally, this will create a file
 `evaluation-results/<linker_name>/<adjusted_experiment_name>.<benchmark_name>.metadata.jsonl` that contains metadata
  information such as an experiment description and the experiment name that will be displayed in the evaluation
- webapp. The description can be specified using the `-desc` argument.
+ webapp. The description can be specified using the `-desc` argument. Per default, the description from the linker's
+ config file is used. You can also simply adjust the description and experiment name in the metadata file at any time.
 
 For a list of entity linkers included in ELEVANT, see [Included Linkers](included_linkers.md).
 
@@ -142,7 +143,8 @@ The Ambiverse prediction reader is implemented [here](../src/prediction_readers/
 ### Writing a Custom Prediction Reader
 As an alternative to converting your predictions into one of the formats mentioned above, you can write your own
  prediction reader, such that you can use your prediction files with the `link_benchmark_entities.py` script directly.
- This requires three steps:
+ This requires three steps. **Note: Make sure you perform the following steps outside of the docker container,
+ otherwise your changes will be lost when exiting the container.**:
 
 1) Implement a prediction reader in `src/prediction_readers/` that inherits from
  `src.prediction_readers.abstract_prediction_reader.AbstractPredictionReader`. You must either implement the

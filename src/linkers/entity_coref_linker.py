@@ -6,9 +6,9 @@ import spacy
 import re
 from collections import defaultdict
 
+import src.utils.custom_sentencizer  # import is needed so Python finds the custom component
 from src.linkers.abstract_coref_linker import AbstractCorefLinker
 from src.models.coref_cluster import CorefCluster
-from src.utils.custom_sentencizer import CustomSentencizer
 from src.utils.dependency_conll_extractor import DependencyConllExtractor
 from src.models.dependency_graph import EnhancedDependencyGraph
 from src.models.entity_database import EntityDatabase
@@ -138,7 +138,7 @@ class EntityCorefLinker(AbstractCorefLinker):
     def __init__(self, entity_db: EntityDatabase, model: Optional[Language] = None):
         if model is None:
             self.model = spacy.load(settings.LARGE_MODEL_NAME)
-            self.model.add_pipe(CustomSentencizer.set_custom_boundaries, before="parser")
+            self.model.add_pipe("custom_sentencizer", before="parser")
         else:
             self.model = model
         self.entity_db = entity_db
@@ -236,12 +236,11 @@ class EntityCorefLinker(AbstractCorefLinker):
                     types = set()
                     if self.entity_db.has_coreference_types(entity_id):
                         for type_id in self.entity_db.get_coreference_types(entity_id):
-                            if self.entity_db.contains_entity(type_id):
-                                type_entity = self.entity_db.get_entity(type_id)
-                                names = type_entity.synonyms | {type_entity.name}
-                                for name in names:
-                                    name_list = name.lower().split("/")
-                                    types.update(name_list)
+                            type_entity_aliases = self.entity_db.get_entity_aliases(type_id) | \
+                                                  {self.entity_db.get_entity_name(type_id)}
+                            for alias in type_entity_aliases:
+                                alias_list = alias.lower().split("/")
+                                types.update(alias_list)
                         seen_types.update(types)
                     referenced_entity = ReferencedEntity(span, entity_id, gender, types, deps, direct_speech)
                     recent_ents_per_sent[-1][(tok_idx, end_idx)] = referenced_entity

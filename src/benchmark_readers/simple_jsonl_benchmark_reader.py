@@ -1,5 +1,6 @@
-from typing import Iterator
+from typing import Iterator, Optional
 
+from src.benchmark_readers.abstract_benchmark_reader import AbstractBenchmarkReader
 from src.evaluation.groundtruth_label import GroundtruthLabel
 from src.models.article import Article
 from src.models.entity_database import EntityDatabase
@@ -14,11 +15,12 @@ from src.utils.nested_groundtruth_handler import NestedGroundtruthHandler
 logger = logging.getLogger("main." + __name__.split(".")[-1])
 
 
-class SimpleJsonlBenchmarkReader:
-    def __init__(self, entity_db: EntityDatabase, benchmark_path: str):
+class SimpleJsonlBenchmarkReader(AbstractBenchmarkReader):
+    def __init__(self, entity_db: EntityDatabase, benchmark_path: str, custom_mappings: Optional[bool] = False):
         self.entity_db = entity_db
         self.benchmark_path = benchmark_path
         self.article_id_counter = 0
+        self.custom_mappings = custom_mappings
 
     def get_articles_from_file(self, filepath: str) -> Iterator[Article]:
         """
@@ -36,7 +38,10 @@ class SimpleJsonlBenchmarkReader:
                 for raw_label in benchmark_json["labels"]:
                     span = raw_label["start_char"], raw_label["end_char"]
                     entity_uri = raw_label["entity_reference"]
-                    entity_id = KnowledgeBaseMapper.get_wikidata_qid(entity_uri, self.entity_db, verbose=False)
+                    if self.custom_mappings:
+                        entity_id = entity_uri
+                    else:
+                        entity_id = KnowledgeBaseMapper.get_wikidata_qid(entity_uri, self.entity_db, verbose=False)
                     if not entity_id:
                         no_mapping_count += 1
                         entity_id = "Unknown"

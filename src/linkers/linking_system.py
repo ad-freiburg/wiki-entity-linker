@@ -2,27 +2,7 @@ import json
 import os
 from typing import Optional, Tuple, Dict, Set, Any
 
-from src.prediction_readers.wexea_prediction_reader import WexeaPredictionReader
-from src.linkers.dbpedia_spotlight_linker import DbpediaSpotlightLinker
-from src.prediction_readers.epgel_prediction_reader import EPGELPredictionReader
-from src.prediction_readers.simple_jsonl_prediction_reader import SimpleJsonlPredictionReader
-from src.prediction_readers.nif_prediction_reader import NifPredictionReader
-from src.prediction_readers.wikifier_prediction_reader import WikifierPredictionReader
-from src.prediction_readers.ambiverse_prediction_reader import AmbiversePredictionReader
-from src.linkers.baseline_linker import BaselineLinker
-from src.linkers.bert_linker import BertLinker
-from src.linkers.entity_coref_linker import EntityCorefLinker
 from src.linkers.linkers import Linkers, LinkLinkers, CoreferenceLinkers, PredictionFormats
-from src.linkers.popular_entities_linker import PopularEntitiesLinker
-from src.linkers.prior_linker import PriorLinker
-from src.linkers.trained_entity_linker import TrainedEntityLinker
-from src.linkers.link_entity_linker import LinkEntityLinker
-from src.linkers.link_text_entity_linker import LinkTextEntityLinker
-from src.linkers.neuralcoref_coref_linker import NeuralcorefCorefLinker
-from src.linkers.stanford_corenlp_coref_linker import StanfordCoreNLPCorefLinker
-from src.linkers.tagme_linker import TagMeLinker
-from src.linkers.spacy_linker import SpacyLinker
-from src.linkers.xrenner_coref_linker import XrennerCorefLinker
 from src.models.article import Article
 from src.models.entity_database import EntityDatabase, MappingName
 
@@ -41,7 +21,8 @@ class LinkingSystem:
                  link_linker: Optional[str] = None,
                  coref_linker: Optional[str] = None,
                  min_score: Optional[int] = None,
-                 type_mapping_file: Optional[str] = None):
+                 type_mapping_file: Optional[str] = None,
+                 custom_mappings: Optional[bool] = False):
         self.linker = None
         self.prediction_reader = None
         self.prediction_name = prediction_name
@@ -52,6 +33,12 @@ class LinkingSystem:
         self.globally = False
         self.type_mapping_file = type_mapping_file  # Only needed for pure prior linker
         self.linker_config = self.read_linker_config(linker_name, config_path) if linker_name else {}
+        self.custom_mappings = custom_mappings
+
+        if custom_mappings and prediction_format not in {PredictionFormats.NIF.value,
+                                                         PredictionFormats.SIMPLE_JSONL.value}:
+            logger.warning(f"Using a custom ontology is not supported for linking result format {prediction_format}. "
+                           f"Please choose a different format.")
 
         self._initialize_entity_db(linker_name, link_linker, coref_linker, min_score)
         self._initialize_link_linker(link_linker)
@@ -60,14 +47,18 @@ class LinkingSystem:
 
     def _initialize_entity_db(self, linker_name: str, link_linker: str, coref_linker: str, min_score: int):
         # Linkers for which not to load entities into the entity database
-        no_db_linkers = (Linkers.TAGME.value, Linkers.DBPEDIA_SPOTLIGHT.value, Linkers.NONE.value)
+        # The Wikipedia2Wikidata mapping that might be loaded in _initialize_linker()
+        # remains unaffected by this.
+        no_db_linkers = (Linkers.TAGME.value, Linkers.DBPEDIA_SPOTLIGHT.value, Linkers.NONE.value,
+                         Linkers.REFINED.value, Linkers.REL.value, Linkers.WAT.value, Linkers.SPACY.value)
 
         self.entity_db = EntityDatabase()
 
         # When a prediction_file is given linker_name is None
         if link_linker or coref_linker or (linker_name is not None and linker_name not in no_db_linkers):
-            self.entity_db.load_all_entities_in_wikipedia(minimum_sitelink_count=min_score,
-                                                          type_mapping=self.type_mapping_file)
+            self.entity_db.load_all_entities_in_wikipedia(minimum_sitelink_count=min_score)
+            self.entity_db.load_entity_types(self.type_mapping_file)
+            self.entity_db.load_entity_names()
 
     @staticmethod
     def read_linker_config(linker_name: str, config_path: Optional[str] = None) -> Dict[str, Any]:
@@ -104,27 +95,34 @@ class LinkingSystem:
         linker_exists = True
 
         if linker_type == Linkers.SPACY.value:
-            self.linker = SpacyLinker(self.entity_db, self.linker_config)
+            from src.linkers.spacy_linker import SpacyLinker
+            self.linker = SpacyLinker(self.linker_config)
         elif linker_type == PredictionFormats.AMBIVERSE.value:
+            from src.prediction_readers.ambiverse_prediction_reader import AmbiversePredictionReader
             self.load_missing_mappings({MappingName.WIKIPEDIA_WIKIDATA,
                                         MappingName.REDIRECTS})
             self.prediction_reader = AmbiversePredictionReader(prediction_file, self.entity_db)
         elif linker_type == Linkers.TAGME.value:
+            from src.linkers.tagme_linker import TagMeLinker
             self.load_missing_mappings({MappingName.WIKIPEDIA_WIKIDATA,
                                         MappingName.REDIRECTS})
             self.linker = TagMeLinker(self.entity_db, self.linker_config)
         elif linker_type == PredictionFormats.WEXEA.value:
+            from src.prediction_readers.wexea_prediction_reader import WexeaPredictionReader
             self.load_missing_mappings({MappingName.WIKIPEDIA_WIKIDATA,
                                         MappingName.REDIRECTS})
             self.prediction_reader = WexeaPredictionReader(prediction_file, self.entity_db)
         elif linker_type == PredictionFormats.SIMPLE_JSONL.value:
-            self.load_missing_mappings({MappingName.WIKIPEDIA_WIKIDATA,
-                                        MappingName.REDIRECTS})
-            self.prediction_reader = SimpleJsonlPredictionReader(prediction_file, self.entity_db)
+            from src.prediction_readers.simple_jsonl_prediction_reader import SimpleJsonlPredictionReader
+            if not self.custom_mappings:
+                self.load_missing_mappings({MappingName.WIKIPEDIA_WIKIDATA,
+                                            MappingName.REDIRECTS})
+            self.prediction_reader = SimpleJsonlPredictionReader(prediction_file, self.entity_db, self.custom_mappings)
         elif linker_type == Linkers.BASELINE.value:
+            from src.linkers.baseline_linker import BaselineLinker
             if self.linker_config["strategy"] == "wikidata":
                 self.load_missing_mappings({MappingName.WIKIDATA_ALIASES,
-                                            MappingName.NAME_ALIASES,
+                                            MappingName.FAMILY_NAME_ALIASES,
                                             MappingName.SITELINKS})
             else:
                 if self.linker_config["strategy"] != "wikipedia":
@@ -133,44 +131,63 @@ class LinkingSystem:
                                             MappingName.REDIRECTS,
                                             MappingName.LINK_ALIASES,
                                             MappingName.LINK_FREQUENCIES,
-                                            MappingName.NAME_ALIASES,
+                                            MappingName.FAMILY_NAME_ALIASES,
                                             MappingName.WIKIDATA_ALIASES})
-                self.linker = BaselineLinker(self.entity_db, self.linker_config)
+            self.linker = BaselineLinker(self.entity_db, self.linker_config)
         elif linker_type == Linkers.TRAINED_MODEL.value:
+            from src.linkers.trained_entity_linker import TrainedEntityLinker
             self.linker = TrainedEntityLinker(self.entity_db, self.linker_config)
-        elif linker_type == Linkers.BERT_MODEL.value:
-            self.linker = BertLinker(self.entity_db, self.linker_config)
         elif linker_type == Linkers.POPULAR_ENTITIES.value:
-            min_score = self.linker_config["min_score"]
-            self.load_missing_mappings({MappingName.NAME_ALIASES,
+            from src.linkers.popular_entities_linker import PopularEntitiesLinker
+            self.load_missing_mappings({MappingName.FAMILY_NAME_ALIASES,
                                         MappingName.WIKIDATA_ALIASES,
                                         MappingName.LANGUAGES,
                                         MappingName.DEMONYMS,
-                                        MappingName.SITELINKS}, min_score)
+                                        MappingName.SITELINKS,
+                                        MappingName.NAME_TO_ENTITY_ID})
             self.linker = PopularEntitiesLinker(self.entity_db, self.linker_config)
             self.globally = True
         elif linker_type == PredictionFormats.WIKIFIER.value:
+            from src.prediction_readers.wikifier_prediction_reader import WikifierPredictionReader
             self.load_missing_mappings({MappingName.WIKIPEDIA_WIKIDATA,
                                         MappingName.REDIRECTS,
                                         MappingName.WIKIPEDIA_ID_WIKIPEDIA_TITLE})
             self.prediction_reader = WikifierPredictionReader(prediction_file, self.entity_db)
         elif linker_type == Linkers.POS_PRIOR.value:
+            from src.linkers.prior_linker import PriorLinker
             self.load_missing_mappings({MappingName.WIKIPEDIA_WIKIDATA,
                                         MappingName.REDIRECTS,
                                         MappingName.LINK_FREQUENCIES,
-                                        MappingName.NAME_ALIASES,
-                                        MappingName.WIKIDATA_ALIASES})
+                                        MappingName.ENTITY_ID_TO_ALIAS,
+                                        MappingName.ENTITY_ID_TO_FAMILY_NAME})
             self.linker = PriorLinker(self.entity_db, self.linker_config)
         elif linker_type == PredictionFormats.NIF.value:
-            self.load_missing_mappings({MappingName.WIKIPEDIA_WIKIDATA,
-                                        MappingName.REDIRECTS})
-            self.prediction_reader = NifPredictionReader(prediction_file, self.entity_db)
+            from src.prediction_readers.nif_prediction_reader import NifPredictionReader
+            if not self.custom_mappings:
+                self.load_missing_mappings({MappingName.WIKIPEDIA_WIKIDATA,
+                                            MappingName.REDIRECTS})
+            self.prediction_reader = NifPredictionReader(prediction_file, self.entity_db, self.custom_mappings)
         elif linker_type == PredictionFormats.EPGEL.value:
+            from src.prediction_readers.epgel_prediction_reader import EPGELPredictionReader
             self.prediction_reader = EPGELPredictionReader(prediction_file)
         elif linker_type == Linkers.DBPEDIA_SPOTLIGHT.value:
+            from src.linkers.dbpedia_spotlight_linker import DbpediaSpotlightLinker
             self.load_missing_mappings({MappingName.WIKIPEDIA_WIKIDATA,
                                         MappingName.REDIRECTS})
             self.linker = DbpediaSpotlightLinker(self.entity_db, self.linker_config)
+        elif linker_type == Linkers.REFINED.value:
+            from src.linkers.refined_linker import RefinedLinker
+            self.linker = RefinedLinker(self.linker_config)
+        elif linker_type == Linkers.REL.value:
+            from src.linkers.rel_linker import RelLinker
+            self.load_missing_mappings({MappingName.WIKIPEDIA_WIKIDATA,
+                                        MappingName.REDIRECTS})
+            self.linker = RelLinker(self.entity_db, self.linker_config)
+        elif linker_type == Linkers.WAT.value:
+            from src.linkers.wat_linker import WatLinker
+            self.load_missing_mappings({MappingName.WIKIPEDIA_WIKIDATA,
+                                        MappingName.REDIRECTS})
+            self.linker = WatLinker(self.entity_db, self.linker_config)
         else:
             linker_exists = False
 
@@ -187,15 +204,17 @@ class LinkingSystem:
         logger.info("Initializing link linker %s ..." % linker_type)
         linker_exists = True
         if linker_type == LinkLinkers.LINK_TEXT_LINKER.value:
+            from src.linkers.link_text_entity_linker import LinkTextEntityLinker
             self.load_missing_mappings({MappingName.WIKIPEDIA_WIKIDATA,
                                         MappingName.REDIRECTS,
                                         MappingName.WIKIDATA_ALIASES,
-                                        MappingName.NAME_ALIASES,
+                                        MappingName.FAMILY_NAME_ALIASES,
                                         MappingName.NAMES,
                                         MappingName.TITLE_SYNONYMS,
                                         MappingName.AKRONYMS})
             self.link_linker = LinkTextEntityLinker(self.entity_db)
         elif linker_type == LinkLinkers.LINK_LINKER.value:
+            from src.linkers.link_entity_linker import LinkEntityLinker
             self.link_linker = LinkEntityLinker()
         else:
             linker_exists = False
@@ -209,16 +228,22 @@ class LinkingSystem:
         logger.info("Initializing coref linker %s ..." % linker_type)
         linker_exists = True
         if linker_type == CoreferenceLinkers.NEURALCOREF.value:
+            from src.linkers.neuralcoref_coref_linker import NeuralcorefCorefLinker
             self.coref_linker = NeuralcorefCorefLinker()
         elif linker_type == CoreferenceLinkers.ENTITY.value:
+            from src.linkers.entity_coref_linker import EntityCorefLinker
             self.load_missing_mappings({MappingName.GENDER,
-                                        MappingName.COREFERENCE_TYPES})
+                                        MappingName.COREFERENCE_TYPES,
+                                        MappingName.ENTITY_ID_TO_ALIAS})
             self.coref_linker = EntityCorefLinker(self.entity_db)
         elif linker_type == CoreferenceLinkers.STANFORD.value:
+            from src.linkers.stanford_corenlp_coref_linker import StanfordCoreNLPCorefLinker
             self.coref_linker = StanfordCoreNLPCorefLinker()
         elif linker_type == CoreferenceLinkers.XRENNER.value:
+            from src.linkers.xrenner_coref_linker import XrennerCorefLinker
             self.coref_linker = XrennerCorefLinker()
         elif linker_type == CoreferenceLinkers.WEXEA.value:
+            from src.prediction_readers.wexea_prediction_reader import WexeaPredictionReader
             self.load_missing_mappings({MappingName.WIKIPEDIA_WIKIDATA,
                                         MappingName.REDIRECTS})
             self.coref_prediction_iterator = WexeaPredictionReader(prediction_file, self.entity_db)\
@@ -258,36 +283,46 @@ class LinkingSystem:
             predicted_coref_entities = next(self.coref_prediction_iterator)
             article.link_entities(predicted_coref_entities, "PREDICTION_READER_COREF", "PREDICTION_READER_COREF")
 
-    def load_missing_mappings(self, mappings: Set[MappingName], min_count: Optional[int] = 1):
-        if MappingName.WIKIPEDIA_WIKIDATA in mappings and not self.entity_db.is_wikipedia_wikidata_mapping_loaded():
-            self.entity_db.load_wikipedia_wikidata_mapping()
+    def load_missing_mappings(self, mappings: Set[MappingName]):
+        if MappingName.WIKIPEDIA_WIKIDATA in mappings and not self.entity_db.is_wikipedia_to_wikidata_mapping_loaded():
+            self.entity_db.load_wikipedia_to_wikidata_db()
         if MappingName.REDIRECTS in mappings and not self.entity_db.is_redirects_loaded():
             self.entity_db.load_redirects()
         if MappingName.LINK_FREQUENCIES in mappings and not self.entity_db.is_link_frequencies_loaded():
             self.entity_db.load_link_frequencies()
 
         # Alias mappings
-        if MappingName.NAME_ALIASES in mappings and not self.entity_db.loaded_info.get(MappingName.NAME_ALIASES):
-            self.entity_db.add_name_aliases()
         if MappingName.WIKIDATA_ALIASES in mappings and not self.entity_db.loaded_info.get(MappingName.WIKIDATA_ALIASES):
-            self.entity_db.add_wikidata_aliases()
+            self.entity_db.load_alias_to_entities()
+        if MappingName.FAMILY_NAME_ALIASES in mappings and not self.entity_db.loaded_info.get(MappingName.FAMILY_NAME_ALIASES):
+            self.entity_db.load_family_name_aliases()
         if MappingName.LINK_ALIASES in mappings and not self.entity_db.loaded_info.get(MappingName.LINK_ALIASES):
-            self.entity_db.add_link_aliases()
-        if MappingName.NAMES in mappings and not self.entity_db.is_names_loaded():
-            self.entity_db.load_names()
-        if MappingName.TITLE_SYNONYMS in mappings and not self.entity_db.is_title_synonyms_loaded():
-            self.entity_db.load_title_synonyms()
-        if MappingName.AKRONYMS in mappings and not self.entity_db.is_akronyms_loaded():
-            self.entity_db.load_akronyms()
+            self.entity_db.load_link_aliases()
+
+        # Inverse alias mappings
+        if MappingName.ENTITY_ID_TO_ALIAS in mappings and not self.entity_db.loaded_info.get(MappingName.ENTITY_ID_TO_ALIAS):
+            self.entity_db.load_entity_to_aliases()
+        if MappingName.ENTITY_ID_TO_FAMILY_NAME in mappings and not self.entity_db.loaded_info.get(MappingName.ENTITY_ID_TO_FAMILY_NAME):
+            self.entity_db.load_entity_to_family_name()
+        if MappingName.ENTITY_ID_TO_LINK_ALIAS in mappings and not self.entity_db.loaded_info.get(MappingName.ENTITY_ID_TO_LINK_ALIAS):
+            self.entity_db.load_entity_to_link_aliases()
 
         if MappingName.LANGUAGES in mappings and not self.entity_db.has_languages_loaded():
             self.entity_db.load_languages()
         if MappingName.DEMONYMS in mappings and not self.entity_db.has_demonyms_loaded():
             self.entity_db.load_demonyms()
         if MappingName.SITELINKS in mappings and not self.entity_db.has_sitelink_counts_loaded():
-            self.entity_db.load_sitelink_counts(min_count=min_count)
+            self.entity_db.load_sitelink_counts()
         if MappingName.WIKIPEDIA_ID_WIKIPEDIA_TITLE in mappings and not self.entity_db.has_wikipedia_id2wikipedia_title_loaded():
             self.entity_db.load_wikipedia_id2wikipedia_title()
+        if MappingName.NAME_TO_ENTITY_ID in mappings and not self.entity_db.loaded_info.get(MappingName.NAME_TO_ENTITY_ID):
+            self.entity_db.load_name_to_entities()
+        if MappingName.TITLE_SYNONYMS in mappings and not self.entity_db.is_title_synonyms_loaded():
+            self.entity_db.load_title_synonyms()
+        if MappingName.AKRONYMS in mappings and not self.entity_db.is_akronyms_loaded():
+            self.entity_db.load_akronyms()
+        if MappingName.NAMES in mappings and not self.entity_db.is_names_loaded():
+            self.entity_db.load_names()
 
         if MappingName.GENDER in mappings and not self.entity_db.is_gender_loaded():
             self.entity_db.load_gender()
