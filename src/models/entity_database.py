@@ -84,8 +84,6 @@ class EntityDatabase:
         self.entity_frequencies: Dict[str, int]
         self.given_names = {}
         self.given_names: Dict[str, str]
-        self.family_names = {}
-        self.family_names: Dict[str, str]
         self.title_synonyms = {}
         self.title_synonyms: Dict[str, Set[str]]
         self.akronyms = {}
@@ -404,15 +402,12 @@ class EntityDatabase:
         for entity_id, name in EntityDatabaseReader.read_human_names():
             if " " in name:
                 given_name = name.split()[0]
-                family_name = name.split()[-1]
                 if len(given_name) > 1:
                     self.given_names[entity_id] = given_name
-                if len(family_name) > 1:
-                    self.family_names[entity_id] = family_name
         logger.info("-> Family and given names loaded.")
 
     def is_names_loaded(self) -> bool:
-        return len(self.given_names) > 0 and len(self.family_names) > 0
+        return len(self.given_names) > 0
 
     def has_given_name(self, entity_id: str) -> bool:
         if len(self.given_names) == 0:
@@ -423,16 +418,6 @@ class EntityDatabase:
 
     def get_given_name(self, entity_id: str) -> str:
         return self.given_names[entity_id]
-
-    def has_family_name(self, entity_id: str) -> bool:
-        if len(self.family_names) == 0:
-            logger.warning("Tried to access family names mapping but family name mapping was not loaded.")
-        if entity_id in self.family_names:
-            return True
-        return False
-
-    def get_family_name(self, entity_id: str) -> str:
-        return self.family_names[entity_id]
 
     def load_gender(self):
         self.entity2gender = EntityDatabaseReader.get_gender_mapping()

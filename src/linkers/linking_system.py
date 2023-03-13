@@ -207,8 +207,8 @@ class LinkingSystem:
             from src.linkers.link_text_entity_linker import LinkTextEntityLinker
             self.load_missing_mappings({MappingName.WIKIPEDIA_WIKIDATA,
                                         MappingName.REDIRECTS,
-                                        MappingName.WIKIDATA_ALIASES,
-                                        MappingName.FAMILY_NAME_ALIASES,
+                                        MappingName.ENTITY_ID_TO_ALIAS,
+                                        MappingName.ENTITY_ID_TO_FAMILY_NAME,
                                         MappingName.NAMES,
                                         MappingName.TITLE_SYNONYMS,
                                         MappingName.AKRONYMS})
