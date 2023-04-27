@@ -1,4 +1,4 @@
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 
 from src.evaluation.case import Case, ErrorLabel, EvaluationMode
 from src.evaluation.groundtruth_label import GroundtruthLabel
@@ -8,13 +8,19 @@ from src.models.wikidata_entity import WikidataEntity
 from src.models.article import Article
 
 
+LOCATION_TYPE_QID = "Q27096213"
+ETHNICITY_TYPE_QID = "Q33829"
+PERSON_TYPE_QID = "Q215627"
+FICTIONAL_CHARACTER_QID = "Q95074"
+
+
 def label_errors(article: Article,
                  cases: List[Case],
                  entity_db: EntityDatabase,
                  eval_mode: EvaluationMode,
                  contains_unknowns: bool):
+    cases = [case for case in cases if case.true_entity is None or case.true_entity.parent is None]
     label_undetected_errors(cases, eval_mode)
-    label_correct(cases, entity_db, eval_mode)
     label_disambiguation_errors(cases, entity_db, eval_mode)
     label_false_detections(cases, contains_unknowns, eval_mode)
     label_candidate_errors(cases, eval_mode)
@@ -22,6 +28,7 @@ def label_errors(article: Article,
     label_hyperlink_errors(article, cases, eval_mode)
     label_span_errors(cases, eval_mode)
     label_coreference_errors(cases, article.text, eval_mode)
+    label_correct(cases, entity_db, eval_mode)
 
 
 def is_subspan(span: Tuple[int, int], subspan: Tuple[int, int]) -> bool:
@@ -96,11 +103,11 @@ def is_rare_case(case: Case, entity_db: EntityDatabase) -> bool:
     most_popular_candidate, score = get_most_popular_candidate(entity_db, case.text)
     # Right now, this is always true when the entity is Unknown and there exists at least one candidate.
     # So many evaluated cases with unknown GT are automatically rare errors.
-    # Also compare with sitelink count of true entity, because it's not a rare case if
-    # the most popular candidate has the same sitelink count as the true entity (e.g. both 0).
+    # Also compare with popularity of true entity, because it's not a rare case if
+    # the most popular candidate has the same popularity as the true entity (e.g. both 0).
     return most_popular_candidate and \
-           case.true_entity.entity_id != most_popular_candidate and \
-           score != entity_db.get_sitelink_count(case.true_entity.entity_id)
+        case.true_entity.entity_id != most_popular_candidate and \
+        score != entity_db.get_link_frequency(case.text, case.true_entity.entity_id)
 
 
 def label_correct(cases: List[Case], entity_db: EntityDatabase, eval_mode: EvaluationMode):
@@ -112,42 +119,60 @@ def label_correct(cases: List[Case], entity_db: EntityDatabase, eval_mode: Evalu
     - rare correct
     """
     for case in cases:
-        if not case.is_coreference() and case.is_linking_tp(eval_mode):
-            if is_demonym(case, entity_db):
-                case.add_error_label(ErrorLabel.DISAMBIGUATION_DEMONYM_CORRECT, eval_mode)
-            elif is_metonymy(case, entity_db):
-                case.add_error_label(ErrorLabel.DISAMBIGUATION_METONYMY_CORRECT, eval_mode)
-            elif is_partial_name(case):
-                case.add_error_label(ErrorLabel.DISAMBIGUATION_PARTIAL_NAME_CORRECT, eval_mode)
-            elif is_rare_case(case, entity_db):
-                case.add_error_label(ErrorLabel.DISAMBIGUATION_RARE_CORRECT, eval_mode)
+        if not case.is_coreference():
+            if case.is_linking_tp(eval_mode):
+                # Label correct disambiguation cases
+                case.add_error_label(ErrorLabel.DISAMBIGUATION_CORRECT, eval_mode)
+                if is_demonym(case, entity_db):
+                    case.add_error_label(ErrorLabel.DISAMBIGUATION_DEMONYM_CORRECT, eval_mode)
+                elif is_metonymy(case, entity_db):
+                    case.add_error_label(ErrorLabel.DISAMBIGUATION_METONYMY_CORRECT, eval_mode)
+                elif is_partial_name(case):
+                    case.add_error_label(ErrorLabel.DISAMBIGUATION_PARTIAL_NAME_CORRECT, eval_mode)
+                elif is_rare_case(case, entity_db):
+                    case.add_error_label(ErrorLabel.DISAMBIGUATION_RARE_CORRECT, eval_mode)
+            # Label potential NER FN error cases
+            if case.is_ner_tp(eval_mode):
+                case.add_error_label(ErrorLabel.AVOIDED_NER_FN, eval_mode)
+            if (case.is_ner_tp(eval_mode) or case.is_ner_fp(eval_mode)) and \
+                    ErrorLabel.NER_FP_WRONG_SPAN not in case.error_labels[eval_mode]:
+                case.add_error_label(ErrorLabel.AVOIDED_NER_FP_WRONG_SPAN, eval_mode)
+            if not is_named_entity(case.text):
+                # Label NER TP lowercased cases
+                if case.is_ner_tp(eval_mode):
+                    case.add_error_label(ErrorLabel.AVOIDED_NER_FN_LOWERCASED, eval_mode)
+            elif ' ' in case.text:
+                # Note: Checking for mentions that contain a whitespace is only an approximation for where partially
+                # included errors can be made. Some linkers e.g. would link only "U.S." in "U.S.-based" or
+                # "Ala" in "Ala." or "US" in "US$". This results in different denominators for different linkers
+                # (since such a linker would get +1 error there).
+                # This is very rare though. E.g. TagMe's denominator on AIDA-CoNLL is 6 greater than ReFinED's.
+                if (case.is_ner_tp(eval_mode) or case.is_ner_fn(eval_mode)) \
+                        and ErrorLabel.NER_FN_PARTIALLY_INCLUDED not in case.error_labels[eval_mode]:
+                    # Label cases where a partially included error could potentially have happened but did not
+                    case.add_error_label(ErrorLabel.AVOIDED_NER_FN_PARTIALLY_INCLUDED, eval_mode)
+            if is_named_entity(case.text) and (case.is_ner_tp(eval_mode) or case.is_ner_fn(eval_mode)):
+                if ErrorLabel.NER_FN_PARTIAL_OVERLAP not in case.error_labels[eval_mode]:
+                    case.add_error_label(ErrorLabel.AVOIDED_NER_FN_PARTIAL_OVERLAP, eval_mode)
+                if ErrorLabel.NER_FN_OTHER not in case.error_labels[eval_mode]:
+                    case.add_error_label(ErrorLabel.AVOIDED_NER_FN_OTHER, eval_mode)
 
 
-LOCATION_TYPE_ID = "Q27096213"
-PERSON_TYPE_QID = "Q18336849"
-ETHNICITY_TYPE_ID = "Q41710"
-
-
-def get_most_popular_candidate(entity_db: EntityDatabase, alias: str) -> Tuple[str, int]:
+def get_most_popular_candidate(entity_db: EntityDatabase, alias: str) -> Tuple[Optional[str], Optional[int]]:
     """
-    Returns the entity ID of the most popular candidate for the given alias, or None if no candidate exists.
+    Returns the entity ID of the most popular candidate for the given alias, or None if no candidate exists
+    or all link frequencies are 0.
     """
     candidates = entity_db.get_candidates(alias)
     if len(candidates) == 0:
         return None, None
-    score, most_popular_candidate = max((entity_db.get_sitelink_count(c), c) for c in candidates)
+    # Use the link frequency and not the sitelink count to get the most popular candidate. Otherwise, since we're
+    # including link aliases, it would be enough if a more popular entity was linked once with the alias in Wikipedia,
+    # e.g. France would be a rare error, because it was at least once falsly linked to Turkey in Wikipedia.
+    score, most_popular_candidate = max((entity_db.get_link_frequency(alias, c), c) for c in candidates)
+    if score == 0:
+        return None, None
     return most_popular_candidate, score
-
-
-def is_location_alias(text: str, entity_db: EntityDatabase) -> bool:
-    """
-    The most popular candidate is a location.
-    """
-    most_popular_candidate, _ = get_most_popular_candidate(entity_db, text)
-    if not most_popular_candidate:
-        return False
-    most_popular_entity_types = entity_db.get_entity_types(most_popular_candidate)
-    return LOCATION_TYPE_ID in most_popular_entity_types
 
 
 def is_metonymy(case: Case, entity_db: EntityDatabase) -> bool:
@@ -158,13 +183,14 @@ def is_metonymy(case: Case, entity_db: EntityDatabase) -> bool:
         # Cases with unknown groundtruth are not considered as metonymy errors
         return False
     true_types = entity_db.get_entity_types(case.true_entity.entity_id)
-    if LOCATION_TYPE_ID in true_types or PERSON_TYPE_QID in true_types or ETHNICITY_TYPE_ID in true_types:
+    if LOCATION_TYPE_QID in true_types or PERSON_TYPE_QID in true_types or ETHNICITY_TYPE_QID in true_types or \
+            FICTIONAL_CHARACTER_QID in true_types:
         return False
     most_popular_candidate, _ = get_most_popular_candidate(entity_db, case.text)
     if not most_popular_candidate:
         return False
     most_popular_entity_types = entity_db.get_entity_types(most_popular_candidate)
-    return LOCATION_TYPE_ID in most_popular_entity_types
+    return LOCATION_TYPE_QID in most_popular_entity_types
 
 
 def is_metonymy_error(case: Case, entity_db: EntityDatabase) -> bool:
@@ -174,7 +200,7 @@ def is_metonymy_error(case: Case, entity_db: EntityDatabase) -> bool:
     if not is_metonymy(case, entity_db):
         return False
     predicted_types = entity_db.get_entity_types(case.predicted_entity.entity_id)
-    return LOCATION_TYPE_ID in predicted_types
+    return LOCATION_TYPE_QID in predicted_types
 
 
 def label_disambiguation_errors(cases: List[Case], entity_db: EntityDatabase, eval_mode: EvaluationMode):
@@ -205,9 +231,11 @@ def label_disambiguation_errors(cases: List[Case], entity_db: EntityDatabase, ev
 
 def label_candidate_errors(cases: List[Case], eval_mode: EvaluationMode):
     for case in cases:
-        if not case.is_coreference() and case.is_linking_fn(eval_mode) and case.is_linking_fp(eval_mode) and \
-                not case.true_entity_is_candidate():
-            case.add_error_label(ErrorLabel.DISAMBIGUATION_WRONG_CANDIDATES, eval_mode)
+        if not case.is_coreference() and case.is_ner_tp(eval_mode):
+            if case.is_linking_tp(eval_mode) or case.true_entity_is_candidate():
+                case.add_error_label(ErrorLabel.DISAMBIGUATION_CANDIDATES_CORRECT, eval_mode)
+            elif case.is_linking_fn(eval_mode) and case.is_linking_fp(eval_mode) and not case.true_entity_is_candidate():
+                case.add_error_label(ErrorLabel.DISAMBIGUATION_CANDIDATES_WRONG, eval_mode)
 
 
 def label_multi_candidates(cases: List[Case], eval_mode: EvaluationMode):
