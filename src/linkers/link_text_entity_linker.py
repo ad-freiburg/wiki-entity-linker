@@ -12,6 +12,7 @@ from src.utils.offset_converter import OffsetConverter
 from src.utils.pronoun_finder import PronounFinder
 from src.models.article import Article
 from src import settings
+import src.utils.custom_sentencizer  # import is needed so Python finds the custom component
 
 logger = logging.getLogger("main." + __name__.split(".")[-1])
 
@@ -36,6 +37,7 @@ class LinkTextEntityLinker:
     def __init__(self, entity_db: EntityDatabase, model: Optional[Language] = None):
         if model is None:
             self.model = spacy.load(settings.LARGE_MODEL_NAME)
+            self.model.add_pipe("custom_sentencizer", before="parser")
         else:
             self.model = model
 

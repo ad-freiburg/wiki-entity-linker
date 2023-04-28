@@ -267,6 +267,8 @@ class LinkingSystem:
             # document, only do this once. However, be aware the models of the different components might
             # differ slightly or have different pipeline components.
             doc = self.linker.model(article.text)
+        elif self.link_linker and self.link_linker.model:
+            doc = self.link_linker.model(article.text)
         else:
             doc = None
 
