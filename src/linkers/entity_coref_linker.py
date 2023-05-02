@@ -137,7 +137,7 @@ class EntityCorefLinker(AbstractCorefLinker):
 
     def __init__(self, entity_db: EntityDatabase, model: Optional[Language] = None):
         if model is None:
-            self.model = spacy.load(settings.LARGE_MODEL_NAME)
+            self.model = spacy.load(settings.LARGE_MODEL_NAME, disable=["lemmatizer"])
             self.model.add_pipe("custom_sentencizer", before="parser")
         else:
             self.model = model
@@ -237,8 +237,7 @@ class EntityCorefLinker(AbstractCorefLinker):
                     types = set()
                     if self.entity_db.has_coreference_types(entity_id):
                         for type_id in self.entity_db.get_coreference_types(entity_id):
-                            type_entity_aliases = self.entity_db.get_entity_aliases(type_id) | \
-                                                  {self.entity_db.get_entity_name(type_id)}
+                            type_entity_aliases = self.entity_db.get_entity_aliases(type_id)
                             for alias in type_entity_aliases:
                                 alias_list = alias.lower().split("/")
                                 types.update(alias_list)
