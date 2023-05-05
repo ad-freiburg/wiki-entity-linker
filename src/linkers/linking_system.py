@@ -2,7 +2,7 @@ import json
 import os
 from typing import Optional, Tuple, Dict, Set, Any
 
-from src.linkers.linkers import Linkers, LinkLinkers, CoreferenceLinkers, PredictionFormats
+from src.linkers.linkers import Linkers, HyperlinkLinkers, CoreferenceLinkers, PredictionFormats
 from src.models.article import Article
 from src.models.entity_database import EntityDatabase, MappingName
 from src import settings
@@ -19,7 +19,7 @@ class LinkingSystem:
                  prediction_file: Optional[str] = None,
                  prediction_format: Optional[str] = None,
                  prediction_name: Optional[str] = None,
-                 link_linker: Optional[str] = None,
+                 hyperlink_linker: Optional[str] = None,
                  coref_linker: Optional[str] = None,
                  min_score: Optional[int] = 0,
                  type_mapping_file: Optional[str] = settings.QID_TO_WHITELIST_TYPES_DB,
@@ -27,7 +27,7 @@ class LinkingSystem:
         self.linker = None
         self.prediction_reader = None
         self.prediction_name = prediction_name
-        self.link_linker = None
+        self.hyperlink_linker = None
         self.coref_linker = None
         self.coref_prediction_iterator = None
         self.entity_db = None
@@ -41,12 +41,12 @@ class LinkingSystem:
             logger.warning(f"Using a custom ontology is not supported for linking result format {prediction_format}. "
                            f"Please choose a different format.")
 
-        self._initialize_entity_db(linker_name, link_linker, coref_linker, min_score)
-        self._initialize_link_linker(link_linker)
+        self._initialize_entity_db(linker_name, hyperlink_linker, coref_linker, min_score)
+        self._initialize_hyperlink_linker(hyperlink_linker)
         self._initialize_linker(linker_name, prediction_file, prediction_format)
         self._initialize_coref_linker(coref_linker, prediction_file)
 
-    def _initialize_entity_db(self, linker_name: str, link_linker: str, coref_linker: str, min_score: int):
+    def _initialize_entity_db(self, linker_name: str, hyperlink_linker: str, coref_linker: str, min_score: int):
         # Linkers for which not to load entities into the entity database
         # The Wikipedia2Wikidata mapping that might be loaded in _initialize_linker()
         # remains unaffected by this.
@@ -56,7 +56,7 @@ class LinkingSystem:
         self.entity_db = EntityDatabase()
 
         # When a prediction_file is given linker_name is None
-        if link_linker or coref_linker or (linker_name is not None and linker_name not in no_db_linkers):
+        if hyperlink_linker or coref_linker or (linker_name is not None and linker_name not in no_db_linkers):
             self.entity_db.load_all_entities_in_wikipedia(minimum_sitelink_count=min_score)
             self.entity_db.load_entity_types(self.type_mapping_file)
             self.entity_db.load_entity_names()
@@ -201,11 +201,11 @@ class LinkingSystem:
         else:
             logger.info("Linker type not found or not specified.")
 
-    def _initialize_link_linker(self, linker_type: str):
+    def _initialize_hyperlink_linker(self, linker_type: str):
         logger.info("Initializing link linker %s ..." % linker_type)
         linker_exists = True
-        if linker_type == LinkLinkers.LINK_TEXT_LINKER.value:
-            from src.linkers.link_text_entity_linker import LinkTextEntityLinker
+        if linker_type == HyperlinkLinkers.HYPERLINK_REFERENCE.value:
+            from src.linkers.hyperlink_reference_linker import HyperlinkReferenceLinker
             self.load_missing_mappings({MappingName.WIKIPEDIA_WIKIDATA,
                                         MappingName.REDIRECTS,
                                         MappingName.ENTITY_ID_TO_ALIAS,
@@ -213,10 +213,12 @@ class LinkingSystem:
                                         MappingName.NAMES,
                                         MappingName.TITLE_SYNONYMS,
                                         MappingName.AKRONYMS})
-            self.link_linker = LinkTextEntityLinker(self.entity_db)
-        elif linker_type == LinkLinkers.LINK_LINKER.value:
-            from src.linkers.link_entity_linker import LinkEntityLinker
-            self.link_linker = LinkEntityLinker()
+            self.hyperlink_linker = HyperlinkReferenceLinker(self.entity_db)
+        elif linker_type == HyperlinkLinkers.HYPERLINKS_ONLY.value:
+            from src.linkers.hyperlinks_only_linker import HyperlinksOnlyLinker
+            self.load_missing_mappings({MappingName.WIKIPEDIA_WIKIDATA,
+                                        MappingName.REDIRECTS})
+            self.hyperlink_linker = HyperlinksOnlyLinker(self.entity_db)
         else:
             linker_exists = False
 
@@ -267,13 +269,13 @@ class LinkingSystem:
             # document, only do this once. However, be aware the models of the different components might
             # differ slightly or have different pipeline components.
             doc = self.linker.model(article.text)
-        elif self.link_linker and self.link_linker.model:
-            doc = self.link_linker.model(article.text)
+        elif self.hyperlink_linker and self.hyperlink_linker.model:
+            doc = self.hyperlink_linker.model(article.text)
         else:
             doc = None
 
-        if self.link_linker:
-            self.link_linker.link_entities(article, doc)
+        if self.hyperlink_linker:
+            self.hyperlink_linker.link_entities(article, doc)
 
         if self.linker:
             self.linker.link_entities(article, doc, uppercase=uppercase, globally=self.globally)

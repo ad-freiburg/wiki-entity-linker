@@ -23,7 +23,7 @@ from tqdm import tqdm
 
 from src import settings
 from src.evaluation.benchmark import get_available_benchmarks, Benchmark
-from src.linkers.linkers import Linkers, LinkLinkers, CoreferenceLinkers, PredictionFormats
+from src.linkers.linkers import Linkers, HyperlinkLinkers, CoreferenceLinkers, PredictionFormats
 from src.evaluation.benchmark_iterator import get_benchmark_iterator
 from src.linkers.linking_system import LinkingSystem
 
@@ -37,7 +37,7 @@ def convert_to_filename(string: str):
 
 
 def main(args):
-    if args.link_linker:
+    if args.hyperlink_linker:
         if args.benchmark != [Benchmark.WIKI_EX.value]:
             logger.warning("Using a link linker only makes sense over benchmarks that contain hyperlinks.")
     if args.coreference_linker == "wexea" and not args.prediction_format == "wexea":
@@ -49,7 +49,7 @@ def main(args):
                                    args.prediction_file,
                                    args.prediction_format,
                                    args.prediction_name,
-                                   args.link_linker,
+                                   args.hyperlink_linker,
                                    args.coreference_linker,
                                    args.minimum_score,
                                    args.type_mapping,
@@ -137,8 +137,8 @@ if __name__ == "__main__":
                         help="Benchmark(s) over which to evaluate the linker.")
     parser.add_argument("-dir", "--evaluation_dir", default=settings.EVALUATION_RESULTS_DIR,
                         help="Directory to which the evaluation result files are written.")
-    parser.add_argument("-ll", "--link_linker", choices=[ll.value for ll in LinkLinkers],
-                        help="Link linker to apply before spacy or explosion linker")
+    parser.add_argument("-hl", "--hyperlink_linker", choices=[ll.value for ll in HyperlinkLinkers],
+                        help="Hyperlink linker that is applied before the selected linker.")
     parser.add_argument("-coref", "--coreference_linker", choices=[cl.value for cl in CoreferenceLinkers],
                         help="Coreference linker to apply after entity linkers.")
     parser.add_argument("--only_pronouns", action="store_true",

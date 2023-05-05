@@ -31,8 +31,8 @@ def is_overlapping_span(covered_positions: Set[int], span: Tuple[int, int]) -> b
     return False
 
 
-class LinkTextEntityLinker:
-    LINKER_IDENTIFIER = "LTL"
+class HyperlinkReferenceLinker:
+    LINKER_IDENTIFIER = "Hyperlink Reference Linker"
 
     def __init__(self, entity_db: EntityDatabase, model: Optional[Language] = None):
         if model is None:
@@ -110,7 +110,7 @@ class LinkTextEntityLinker:
                 entity_mention = EntityMention(span=(span[0], end_idx),
                                                recognized_by=self.LINKER_IDENTIFIER,
                                                entity_id=entity_id,
-                                               linked_by="LTL_LINK",
+                                               linked_by="HRL: Hyperlink",
                                                candidates={entity_id})
                 entity_mentions.append(entity_mention)
 
@@ -173,7 +173,7 @@ class LinkTextEntityLinker:
                 entity_mention = EntityMention(span=(start_idx, end_idx),
                                                recognized_by=self.LINKER_IDENTIFIER,
                                                entity_id=entity_id,
-                                               linked_by="LTL_REFERENCE",
+                                               linked_by="HRL Reference",
                                                candidates={entity_id})
                 entity_mentions.append(entity_mention)
                 search_start_idx = end_idx

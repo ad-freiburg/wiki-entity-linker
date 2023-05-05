@@ -15,9 +15,9 @@ class Linkers(Enum):
     NONE = "none"
 
 
-class LinkLinkers(Enum):
-    LINK_LINKER = "link-linker"
-    LINK_TEXT_LINKER = "link-text-linker"
+class HyperlinkLinkers(Enum):
+    HYPERLINKS_ONLY = "hyperlinks-only"
+    HYPERLINK_REFERENCE = "hyperlink-reference"
 
 
 class CoreferenceLinkers(Enum):

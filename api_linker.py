@@ -6,7 +6,7 @@ from pynif import NIFCollection
 from urllib.parse import quote
 from src import settings
 from src.evaluation.benchmark import get_available_benchmarks
-from src.linkers.linkers import Linkers, LinkLinkers, CoreferenceLinkers, PredictionFormats
+from src.linkers.linkers import Linkers, HyperlinkLinkers, CoreferenceLinkers, PredictionFormats
 
 from src.linkers.linking_system import LinkingSystem
 from src.models.article import Article, article_from_json
@@ -71,8 +71,8 @@ if __name__ == "__main__":
     parser.add_argument("-pname", "--prediction_name", default="Unknown Linker",
                         help="Name of the system that produced the predictions.")
 
-    parser.add_argument("-ll", "--link_linker", choices=[ll.value for ll in LinkLinkers],
-                        help="Link linker to apply before spacy or explosion linker")
+    parser.add_argument("-hl", "--hyperlink_linker", choices=[ll.value for ll in HyperlinkLinkers],
+                        help="Hyperlink linker that is applied before the selected linker.")
     parser.add_argument("-coref", "--coreference_linker", choices=[cl.value for cl in CoreferenceLinkers],
                         help="Coreference linker to apply after entity linkers.")
     parser.add_argument("--only_pronouns", action="store_true",
@@ -112,7 +112,7 @@ if __name__ == "__main__":
                                    args.prediction_file,
                                    args.prediction_format,
                                    args.prediction_name,
-                                   args.link_linker,
+                                   args.hyperlink_linker,
                                    args.coreference_linker,
                                    args.minimum_score,
                                    args.type_mapping)

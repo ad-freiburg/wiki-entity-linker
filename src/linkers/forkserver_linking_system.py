@@ -7,7 +7,7 @@ with open(settings.TMP_FORKSERVER_CONFIG_FILE, "r", encoding="utf8") as file:
 
 linking_system = LinkingSystem(config["linker_name"],
                                config["linker_config"],
-                               link_linker=config["link_linker"],
+                               hyperlink_linker=config["hyperlink_linker"],
                                coref_linker=config["coreference_linker"],
                                min_score=config["minimum_score"],
                                type_mapping_file=config["type_mapping"])

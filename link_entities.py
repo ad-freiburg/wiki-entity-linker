@@ -36,7 +36,7 @@ import time
 import log
 
 from src import settings
-from src.linkers.linkers import Linkers, LinkLinkers, CoreferenceLinkers
+from src.linkers.linkers import Linkers, HyperlinkLinkers, CoreferenceLinkers
 from src.linkers.linkers import Linkers, CoreferenceLinkers
 from src.models.article import Article, article_from_json
 from src.helpers.wikipedia_dump_reader import WikipediaDumpReader
@@ -60,8 +60,8 @@ parser.add_argument("--article_format", action="store_true",
                     help="The input file is in our article jsonl format.")
 parser.add_argument("-n", "--n_articles", type=int, default=-1,
                     help="Number of articles to link.")
-parser.add_argument("-ll", "--link_linker", choices=[ll.value for ll in LinkLinkers],
-                    help="Link linker to apply before spacy or explosion linker")
+parser.add_argument("-hl", "--hyperlink_linker", choices=[ll.value for ll in HyperlinkLinkers],
+                    help="Hyperlink linker that is applied before the selected linker. ")
 parser.add_argument("-coref", "--coreference_linker", choices=[cl.value for cl in CoreferenceLinkers],
                     help="Coreference linker to apply after entity linkers.")
 parser.add_argument("--only_pronouns", action="store_true",
@@ -90,7 +90,7 @@ logger.debug(' '.join(sys.argv))
 # configure the linking_system.
 config = {"linker_name": args.linker_name,
           "linker_config": args.linker_config,
-          "link_linker": args.link_linker,
+          "hyperlink_linker": args.hyperlink_linker,
           "coreference_linker": args.coreference_linker,
           "minimum_score": args.minimum_score,
           "type_mapping": args.type_mapping}
