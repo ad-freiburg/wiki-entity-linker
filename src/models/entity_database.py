@@ -33,6 +33,7 @@ class MappingName(Enum):
     ENTITY_ID_TO_ALIAS = "entity_id_to_alias"
     ENTITY_ID_TO_FAMILY_NAME = "entity_id_to_family_name"
     ENTITY_ID_TO_LINK_ALIAS = "entity_id_to_link_alias"
+    HYPERLINK_TO_MOST_POPULAR_CANDIDATES = "hyperlink_alias_to_most_popular_candidates"
 
 
 class LoadingType(Enum):
@@ -78,9 +79,11 @@ class EntityDatabase:
         self.redirects = {}
         self.redirects: Database
         self.link_frequencies = {}
-        self.link_frequencies: Dict[str, Tuple[str, int]]
+        self.link_frequencies: Dict[str, Dict[str, int]]
         self.entity_frequencies = {}
         self.entity_frequencies: Dict[str, int]
+        self.hyperlink_to_most_popular_candidates_db = {}
+        self.hyperlink_to_most_popular_candidates_db: Database
         self.given_names = {}
         self.given_names: Dict[str, str]
         self.title_synonyms = {}
@@ -243,6 +246,25 @@ class EntityDatabase:
         else:
             logger.info(f"-> {len(self.link_aliases)} link aliases loaded into entity database.")
 
+    def load_hyperlink_to_most_popular_candidates(self):
+        logger.info("Loading hyperlink to most popular candidates into entity database ...")
+        if not self.hyperlink_to_most_popular_candidates_db:
+            self.loaded_info[MappingName.HYPERLINK_TO_MOST_POPULAR_CANDIDATES] = LoadedInfo(LoadingType.FULL)
+            self.hyperlink_to_most_popular_candidates_db = \
+                EntityDatabaseReader.get_hyperlink_to_most_popular_candidates_db(
+                    settings.HYPERLINK_TO_MOST_POPULAR_CANDIDATES_DB)
+            logger.info(f"-> {len(self.hyperlink_to_most_popular_candidates_db)} "
+                        f"hyperlink to most popular candidates mappings loaded into entity database.")
+        else:
+            logger.info("Hyperlink to most popular candidates database already loaded.")
+
+    def get_most_popular_candidate_for_hyperlink(self, alias: str) -> Set[str]:
+        if len(self.hyperlink_to_most_popular_candidates_db) == 0:
+            logger.warning("Tried to access hyperlink to most popular candidates database, but db was not loaded.")
+        if alias in self.hyperlink_to_most_popular_candidates_db:
+            return self.hyperlink_to_most_popular_candidates_db[alias]
+        return set()
+
     def get_candidates(self, alias: str) -> Set[str]:
         entity_ids = set()
         if alias in self.name_to_entities_db:
@@ -288,7 +310,8 @@ class EntityDatabase:
                 self.entity_to_link_alias[entity_id].add(link_text)
             else:
                 self.entity_to_link_alias[entity_id] = {link_text}
-        logger.info(f"-> {len(self.link_aliases)} entity ID to link alias mappings loaded into entity database.")
+        logger.info(f"-> {len(self.entity_to_link_alias)} entity ID to link alias mappings loaded into entity "
+                    f"database.")
 
     def load_title_synonyms(self):
         title_synonym_to_entities = EntityDatabaseReader.get_title_synonyms()
@@ -373,11 +396,9 @@ class EntityDatabase:
     def _iterate_link_frequencies(self) -> Iterator[Tuple[str, str, int]]:
         link_frequencies = EntityDatabaseReader.get_link_frequencies()
         for link_text in link_frequencies:
-            for link_target in link_frequencies[link_text]:
-                entity_id = self.link2id(link_target)
-                if entity_id is not None:
-                    frequency = link_frequencies[link_text][link_target]
-                    yield link_text, entity_id, frequency
+            for entity_id in link_frequencies[link_text]:
+                frequency = link_frequencies[link_text][entity_id]
+                yield link_text, entity_id, frequency
 
     def load_link_frequencies(self):
         for link_text, entity_id, frequency in self._iterate_link_frequencies():
@@ -386,6 +407,7 @@ class EntityDatabase:
             if entity_id not in self.link_frequencies[link_text]:
                 self.link_frequencies[link_text][entity_id] = frequency
             else:
+                # This case can happen, when different link targets map to the same article (e.g. due to redirects)
                 self.link_frequencies[link_text][entity_id] += frequency
 
     def load_entity_frequencies(self):
