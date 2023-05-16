@@ -4,11 +4,13 @@ import sys
 
 import spacy
 from spacy.tokens.doc import Doc
+from spacy.language import Language
 
 from src.models.article import article_from_json
 
 
-def set_custom_sentence_boundaries(doc: Doc):
+@Language.component("custom_sentence_boundaries")
+def set_custom_sentence_boundaries(doc: Doc) -> Doc:
     """Manually set sentence starts at newline characters if it's not the last
     token in the document and if it's not followed by another newline character.
     """
@@ -22,8 +24,8 @@ def main(args):
     logger.info("Creating QLever text files for %s" % args.input_file)
 
     model = spacy.blank("en")
-    model.add_pipe(model.create_pipe("sentencizer"))
-    model.add_pipe(set_custom_sentence_boundaries)
+    model.add_pipe("sentencizer")
+    model.add_pipe("custom_sentence_boundaries", after="sentencizer")
 
     record_id = 0
     wordsfile_name = args.output_prefix + ".wordsfile.tsv"
