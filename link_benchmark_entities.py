@@ -38,7 +38,7 @@ def convert_to_filename(string: str):
 
 def main(args):
     if args.hyperlink_linker:
-        if args.benchmark != [Benchmark.WIKI_EX.value]:
+        if args.benchmark != [Benchmark.WIKI_FAIR.value]:
             logger.warning("Using a link linker only makes sense over benchmarks that contain hyperlinks.")
     if args.coreference_linker == "wexea" and not args.prediction_format == "wexea":
         logger.error("Wexea can only be used as coreference linker in combination with the Wexea linker")
