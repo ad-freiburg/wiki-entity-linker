@@ -6,6 +6,7 @@ from spacy.language import Language
 import spacy
 import logging
 
+from src.evaluation.groundtruth_label import GroundtruthLabel
 from src.models.entity_database import EntityDatabase
 from src.models.entity_mention import EntityMention
 from src.utils.offset_converter import OffsetConverter
@@ -85,7 +86,8 @@ class HyperlinkReferenceLinker:
 
             link_text = article.text[span[0]:span[1]]
             entity_id = self.entity_db.link2id(target)
-            if entity_id and not link_text.islower():
+            entity_whitelist_types = self.entity_db.get_entity_types(entity_id)
+            if entity_id and entity_whitelist_types != [GroundtruthLabel.OTHER]:
                 entity_links[link_text] = entity_id
                 self.add_synonyms(entity_id, entity_synonyms)
 
