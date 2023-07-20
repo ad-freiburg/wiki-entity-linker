@@ -85,8 +85,17 @@ args = parser.parse_args()
 logger = log.setup_logger(sys.argv[0], write_to_file=False)
 logger.debug(' '.join(sys.argv))
 
+# Importing the linking_system has to happen here, otherwise a linking_system is not defined error is thrown.
+# In order to not load several GB of mappings twice, only do a fake loading such that the name is imported,
+# but no mappings are loaded
+config = {"no_loading": True}
+with open(settings.TMP_FORKSERVER_CONFIG_FILE, "w", encoding="utf8") as config_file:
+    json.dump(config, config_file)
+
+from src.linkers.forkserver_linking_system import linking_system
+
 # Write command line arguments to temporary config file which is then read by the forkserver_linking_system module.
-# This is not pretty, but I don't see a better solution where the user can still use command line arguments to
+# This is not mega pretty, but I don't see a better solution where the user can still use command line arguments to
 # configure the linking_system.
 config = {"linker_name": args.linker_name,
           "linker_config": args.linker_config,
@@ -97,8 +106,6 @@ config = {"linker_name": args.linker_name,
 with open(settings.TMP_FORKSERVER_CONFIG_FILE, "w", encoding="utf8") as config_file:
     json.dump(config, config_file)
 
-# This has to happen here, otherwise a linking_system is not defined error is thrown.
-from src.linkers.forkserver_linking_system import linking_system
 
 import multiprocessing
 
@@ -146,12 +153,12 @@ def main():
 
     output_file = open(args.output_file, 'w', encoding='utf8')
 
-    logger.info("Start linking using %d processes." % args.multiprocessing)
     i = 0
     iterator = article_iterator(args.input_file)
     if args.multiprocessing > 1:
         multiprocessing.set_start_method('forkserver')
         multiprocessing.set_forkserver_preload(["src.linkers.forkserver_linking_system"])
+        logger.info("Start linking using %d processes." % args.multiprocessing)
         start = time.time()
         last_time = start
         with multiprocessing.Pool(processes=args.multiprocessing, maxtasksperchild=MAX_TASKS_PER_CHILD) as executor:
@@ -168,6 +175,7 @@ def main():
                     last_time = time.time()
         i -= 1  # So final log reports correct number of linked articles with and without multiprocessing
     else:
+        logger.info("Start linking with a single process.")
         start = time.time()
         for i, tupl in enumerate(iterator):
             article, uppercase, only_pronouns = tupl
