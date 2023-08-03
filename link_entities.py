@@ -8,6 +8,7 @@ The linker pipeline consists of three main components:
        entity mentions.
     3) coreference linker: link coreferences to their Wikidata entry.
 
+
 For each component, you can choose between different linker variants or omit
 the component from the pipeline.
 The result is written to a given output file in jsonl format with one article
