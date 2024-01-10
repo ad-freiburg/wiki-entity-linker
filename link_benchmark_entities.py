@@ -13,7 +13,6 @@ per line.
 """
 
 import argparse
-import log
 import sys
 import os
 import json
@@ -22,10 +21,13 @@ from datetime import datetime
 from tqdm import tqdm
 
 from src import settings
+from src.utils import log
+from src.utils.colors import Colors
 from src.evaluation.benchmark import get_available_benchmarks, Benchmark
 from src.linkers.linkers import Linkers, HyperlinkLinkers, CoreferenceLinkers, PredictionFormats
 from src.evaluation.benchmark_iterator import get_benchmark_iterator
 from src.linkers.linking_system import LinkingSystem
+from src.linkers.oracle_linker import link_entities_with_oracle
 
 
 def convert_to_filename(string: str):
@@ -44,16 +46,18 @@ def main(args):
         logger.error("Wexea can only be used as coreference linker in combination with the Wexea linker")
         exit(1)
 
-    linking_system = LinkingSystem(args.linker_name,
-                                   args.linker_config,
-                                   args.prediction_file,
-                                   args.prediction_format,
-                                   args.prediction_name,
-                                   args.hyperlink_linker,
-                                   args.coreference_linker,
-                                   args.minimum_score,
-                                   args.type_mapping,
-                                   args.custom_kb)
+    linking_system = None
+    if not args.linker_name == "oracle":
+        linking_system = LinkingSystem(args.linker_name,
+                                       args.linker_config,
+                                       args.prediction_file,
+                                       args.prediction_format,
+                                       args.prediction_name,
+                                       args.hyperlink_linker,
+                                       args.coreference_linker,
+                                       args.minimum_score,
+                                       args.type_mapping,
+                                       args.custom_kb)
 
     for benchmark in args.benchmark:
         benchmark_iterator = get_benchmark_iterator(benchmark)
@@ -65,18 +69,21 @@ def main(args):
         output_filename = output_dir + "/" + experiment_filename + "." + benchmark + ".linked_articles.jsonl"
         metadata_filename = output_filename[:-len(".linked_articles.jsonl")] + ".metadata.json"
         if output_dir and not os.path.exists(output_dir):
-            logger.info("Creating directory %s" % output_dir)
+            logger.info(f"Creating directory {output_dir}")
             os.makedirs(output_dir)
 
         output_file = open(output_filename, 'w', encoding='utf8')
 
-        logger.info("Linking entities in %s benchmark ..." % benchmark)
+        logger.info(f"Linking entities in {Colors.BLUE}{benchmark}{Colors.END} benchmark ...")
 
         n_articles = 0
         start_time = time.time()
         for i, article in enumerate(tqdm(benchmark_iterator.iterate(), desc="Linking progress", unit=" articles")):
             evaluation_span = article.evaluation_span if args.evaluation_span else None
-            linking_system.link_entities(article, args.uppercase, args.only_pronouns, evaluation_span)
+            if args.linker_name == "oracle":
+                link_entities_with_oracle(article)
+            else:
+                linking_system.link_entities(article, args.uppercase, args.only_pronouns, evaluation_span)
             output_file.write(article.to_json() + '\n')
             n_articles = i+1
         linking_time = time.time() - start_time
@@ -85,7 +92,7 @@ def main(args):
 
         # Write metadata to metadata file
         with open(metadata_filename, "w", encoding="utf8") as metadata_file:
-            linker_config = linking_system.get_linker_config()
+            linker_config = linking_system.get_linker_config() if linking_system else {}
             exp_name = args.experiment_name
             exp_description = None
             if args.description:
@@ -107,8 +114,8 @@ def main(args):
                         "linker_config": linker_config}
             metadata_file.write(json.dumps(metadata))
 
-        logger.info("Wrote metadata to %s" % metadata_filename)
-        logger.info("Wrote %d linked articles to %s" % (n_articles, output_filename))
+        logger.info(f"Wrote metadata to {Colors.BOLD}{metadata_filename}{Colors.END}")
+        logger.info(f"Wrote {n_articles} linked articles to {Colors.BOLD}{output_filename}{Colors.END}")
 
 
 if __name__ == "__main__":
@@ -120,7 +127,7 @@ if __name__ == "__main__":
                              "<evaluation_dir>/<linker_name>/<experiment_name>.<benchmark_name>.linked_articles.jsonl")
 
     linker_group = parser.add_mutually_exclusive_group(required=True)
-    linker_group.add_argument("-l", "--linker_name", choices=[li.value for li in Linkers],
+    linker_group.add_argument("-l", "--linker_name", choices=[li.value for li in Linkers] + ["oracle"],
                               help="Entity linker name.")
     linker_group.add_argument("-pfile", "--prediction_file",
                               help="Path to predictions file.")

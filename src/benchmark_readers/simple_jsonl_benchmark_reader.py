@@ -35,9 +35,10 @@ class SimpleJsonlBenchmarkReader(AbstractBenchmarkReader):
                 title = benchmark_json["title"] if "title" in benchmark_json else ""
                 text = benchmark_json["text"]
                 labels = []
-                for raw_label in benchmark_json["labels"]:
+                for raw_label in sorted(benchmark_json["labels"], key=lambda x: x["start_char"]):
                     span = raw_label["start_char"], raw_label["end_char"]
                     entity_uri = raw_label["entity_reference"]
+                    coref = raw_label["coref"] if "coref" in raw_label else None
                     if self.custom_kb:
                         entity_id = entity_uri
                     else:
@@ -51,7 +52,7 @@ class SimpleJsonlBenchmarkReader(AbstractBenchmarkReader):
                         # format
                         entity_name = "Unknown"
 
-                    labels.append(GroundtruthLabel(label_id_counter, span, entity_id, entity_name))
+                    labels.append(GroundtruthLabel(label_id_counter, span, entity_id, entity_name, coref=coref))
                     label_id_counter += 1
 
                 # Assign parent and child ids to GT labels in case of nested GT labels

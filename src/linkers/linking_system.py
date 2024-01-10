@@ -36,8 +36,7 @@ class LinkingSystem:
         self.linker_config = self.read_linker_config(linker_name, config_path) if linker_name else {}
         self.custom_kb = custom_kb
 
-        if custom_kb and prediction_format not in {PredictionFormats.NIF.value,
-                                                         PredictionFormats.SIMPLE_JSONL.value}:
+        if custom_kb and prediction_format not in {PredictionFormats.NIF.value, PredictionFormats.SIMPLE_JSONL.value}:
             logger.warning(f"Using a custom knowledge base is not supported for linking result format "
                            f"{prediction_format}. Please choose a different format.")
 
@@ -188,6 +187,11 @@ class LinkingSystem:
             self.load_missing_mappings({MappingName.WIKIPEDIA_WIKIDATA,
                                         MappingName.REDIRECTS})
             self.linker = WatLinker(self.entity_db, self.linker_config)
+        elif linker_type == Linkers.GPT.value:
+            from src.linkers.gpt_linker import GPTLinker
+            self.load_missing_mappings({MappingName.WIKIPEDIA_WIKIDATA,
+                                        MappingName.REDIRECTS})
+            self.linker = GPTLinker(self.entity_db, self.linker_config)
         else:
             linker_exists = False
 
@@ -229,10 +233,11 @@ class LinkingSystem:
     def _initialize_coref_linker(self, linker_type: str, prediction_file: str):
         logger.info("Initializing coref linker %s ..." % linker_type)
         linker_exists = True
-        if linker_type == CoreferenceLinkers.NEURALCOREF.value:
-            from src.linkers.neuralcoref_coref_linker import NeuralcorefCorefLinker
-            self.coref_linker = NeuralcorefCorefLinker()
-        elif linker_type == CoreferenceLinkers.ENTITY.value:
+        # Neuralcoref is outdated, see ELEVANT Github issue #5
+        # if linker_type == CoreferenceLinkers.NEURALCOREF.value:
+        #     from src.linkers.neuralcoref_coref_linker import NeuralcorefCorefLinker
+        #     self.coref_linker = NeuralcorefCorefLinker()
+        if linker_type == CoreferenceLinkers.ENTITY.value:
             from src.linkers.entity_coref_linker import EntityCorefLinker
             self.load_missing_mappings({MappingName.GENDER,
                                         MappingName.COREFERENCE_TYPES,
@@ -241,15 +246,18 @@ class LinkingSystem:
         elif linker_type == CoreferenceLinkers.STANFORD.value:
             from src.linkers.stanford_corenlp_coref_linker import StanfordCoreNLPCorefLinker
             self.coref_linker = StanfordCoreNLPCorefLinker()
-        elif linker_type == CoreferenceLinkers.XRENNER.value:
-            from src.linkers.xrenner_coref_linker import XrennerCorefLinker
-            self.coref_linker = XrennerCorefLinker()
         elif linker_type == CoreferenceLinkers.WEXEA.value:
             from src.prediction_readers.wexea_prediction_reader import WexeaPredictionReader
             self.load_missing_mappings({MappingName.WIKIPEDIA_WIKIDATA,
                                         MappingName.REDIRECTS})
             self.coref_prediction_iterator = WexeaPredictionReader(prediction_file, self.entity_db)\
                 .article_coref_predictions_iterator()
+        # elif linker_type == CoreferenceLinkers.XRENNER.value:
+        #     from src.linkers.xrenner_coref_linker import XrennerCorefLinker
+        #     self.coref_linker = XrennerCorefLinker()
+        elif linker_type == CoreferenceLinkers.FASTCOREF.value:
+            from src.linkers.fastcoref_coref_linker import FastcorefCorefLinker
+            self.coref_linker = FastcorefCorefLinker()
         else:
             linker_exists = False
 

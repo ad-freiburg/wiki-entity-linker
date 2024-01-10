@@ -97,6 +97,7 @@ class Case:
         self.factor = 1 if factor is None else factor
         self.child_linking_eval_types = child_linking_eval_types
         self.child_ner_eval_types = child_ner_eval_types
+        self.has_non_optional_children = False
         self.linking_eval_types = {}
         self.ner_eval_types = {}
         self.compute_eval_types()
@@ -106,11 +107,14 @@ class Case:
             self.linking_eval_types[mode] = self._get_linking_eval_type(mode)
             self.ner_eval_types[mode] = self._get_ner_eval_type(mode)
 
-    def set_child_linking_eval_types(self, child_eval_types=Dict[EvaluationMode, Set[EvaluationType]]):
+    def set_child_linking_eval_types(self, child_eval_types: Dict[EvaluationMode, Set[EvaluationType]]):
         self.child_linking_eval_types = child_eval_types
 
-    def set_child_ner_eval_types(self, child_eval_types=Set[EvaluationType]):
+    def set_child_ner_eval_types(self, child_eval_types: Set[EvaluationType]):
         self.child_ner_eval_types = child_eval_types
+
+    def set_has_non_optional_children(self, has_non_optional_children):
+        self.has_non_optional_children = has_non_optional_children
 
     def _get_linking_eval_type(self, eval_mode: EvaluationMode) -> List[EvaluationType]:
         if self.factor == 0:
@@ -150,7 +154,9 @@ class Case:
                 return []
 
         if not self.has_prediction():
-            if self.is_optional():
+            if self.is_optional() and not self.has_non_optional_children:
+                # An optional ground truth label without corresponding prediction might still be
+                # an FN if it has non-optional children (often the case with descriptive GT labels)
                 # optent / ---: IGN, REQ
                 # optunk / ---: IGN, REQ
                 return []
@@ -250,7 +256,9 @@ class Case:
                 return []
 
         if not self.has_prediction():
-            if self.is_optional():
+            if self.is_optional() and not self.has_non_optional_children:
+                # An optional ground truth label without corresponding prediction might still be
+                # an FN if it has non-optional children (often the case with descriptive GT labels)
                 # optent / ---: IGN, REQ
                 # optunk / ---: IGN, REQ
                 return []
@@ -399,7 +407,19 @@ def case_from_dict(data) -> Case:
     # eval_types are freshly computed.
     true_entity = None
     if "true_entity" in data:
-        true_entity = WikidataEntity(data["true_entity"]["entity_id"], data["true_entity"]["name"])
+        gt_label_id = data["true_entity"]["id"]
+        gt_entity_id = data["true_entity"]["entity_id"]
+        gt_span = data["true_entity"]["span"]
+        gt_name = data["true_entity"]["name"]
+        gt_type = data["true_entity"]["type"]
+        gt_parent = data["true_entity"]["parent"] if "parent" in data["true_entity"] else None
+        gt_children = data["true_entity"]["children"] if "children" in data["true_entity"] else None
+        gt_optional = data["true_entity"]["optional"] if "optional" in data["true_entity"] else False
+        gt_coref = data["true_entity"]["coref"] if "coref" in data["true_entity"] else None
+        gt_desc = data["true_entity"]["desc"] if "desc" in data["true_entity"] else False
+        true_entity = GroundtruthLabel(gt_label_id, gt_span, gt_entity_id, gt_name, parent=gt_parent,
+                                       children=gt_children, optional=gt_optional, type=gt_type, coref=gt_coref,
+                                       desc=gt_desc)
     pred_entity = None
     if "predicted_entity" in data:
         pred_entity = WikidataEntity(data["predicted_entity"]["entity_id"], data["predicted_entity"]["name"])

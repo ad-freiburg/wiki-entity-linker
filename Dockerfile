@@ -3,15 +3,12 @@ MAINTAINER Natalie Prange prange@cs.uni-freiburg.de
 WORKDIR /home/
 RUN apt-get update
 RUN apt-get install -y python3 python3-pip git wget vim curl python3-gdbm
-RUN git clone https://github.com/huggingface/neuralcoref.git
-RUN python3 -m pip install -r neuralcoref/requirements.txt
-RUN python3 -m pip install -e neuralcoref
 COPY requirements.txt requirements.txt
 RUN python3 -m pip install -r requirements.txt
 RUN python3 -m spacy download en_core_web_lg
 RUN python3 -m spacy download en_core_web_sm
 COPY src src
-COPY benchmark-webapp benchmark-webapp
+COPY scripts scripts
 COPY evaluation-webapp evaluation-webapp
 RUN mkdir third-party
 COPY third-party/wiki_extractor third-party/wiki_extractor
@@ -20,7 +17,6 @@ COPY small-data-files small-data-files
 COPY configs configs
 COPY Makefile .
 COPY *.py ./
-COPY *.sh ./
 # Set DATA_DIR variable in Makefile to /data/ within the container
 RUN sed -i 's|^DATA_DIR =.*|DATA_DIR = /data/|' Makefile
 # Enable Makefile target autocompletion
