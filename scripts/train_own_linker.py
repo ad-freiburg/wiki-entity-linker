@@ -13,6 +13,8 @@ import sys
 
 from spacy.kb import KnowledgeBase
 
+sys.path.append(".")
+
 from src.helpers.entity_database_reader import EntityDatabaseReader
 from src.helpers.label_generator import LabelGenerator
 from src.utils.embeddings_extractor import EmbeddingsExtractor
