@@ -84,7 +84,6 @@ class HyperlinkReferenceLinker:
                 middle_name_synonyms.add(" ".join([n[0] + "." for n in name_parts[1:-1] if n]) + " ")
                 middle_name_synonyms.add("")
                 middle_name_synonyms = [name_parts[0] + " " + m + name_parts[-1] for m in middle_name_synonyms]
-                print(f"Middle name synonyms for {entity_name}: {middle_name_synonyms}")
         return middle_name_synonyms
 
     def link_entities(self, article: Article, doc: Optional[Doc] = None):
