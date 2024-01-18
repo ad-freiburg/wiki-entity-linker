@@ -51,9 +51,41 @@ class HyperlinkReferenceLinker:
         synonyms = self.entity_db.get_entity_aliases(entity_id)
 
         for syn in synonyms:
-            # Do not append all lowercase synonyms (e.g. "it" for Italy)
+            # Do not append lowercase synonyms (e.g. "it" for Italy)
             if not syn.islower() and syn not in synonym_dict:
                 synonym_dict[syn] = entity_id
+
+        middle_name_synonyms = self.get_middle_name_synonyms(entity_id)
+        if middle_name_synonyms:
+            for middle_name_synonym in middle_name_synonyms:
+                synonym_dict[middle_name_synonym] = entity_id
+
+    def get_middle_name_synonyms(self, entity_id: str) -> Set[str]:
+        """
+        For names that include middle names, e.g. "Habern William Archibald Freeman"
+        add the following name variants as synonyms:
+        "Habern Freeman", "Habern W. A. Freeman", "Habern W.A. Freeman", "Habern W A Freeman"
+        """
+        whitelist_types = self.entity_db.get_entity_types(entity_id)
+        middle_name_synonyms = set()
+        if (settings.TYPE_PERSON_QID in whitelist_types or settings.TYPE_FICTIONAL_CHARACTER_QID in whitelist_types) \
+                and settings.TYPE_ORGANIZATION_QID not in whitelist_types:
+            # Don't do this if the entity also has type organization, since sometimes e.g. bands are
+            # of type person and organization and then something like this happens:
+            # The Blackeyed Susans: {'The B. Susans', 'The B Susans', 'The Susans'}
+            entity_name = self.entity_db.get_entity_name(entity_id)
+            name_parts = entity_name.split(" ")
+            if len(name_parts) > 2 and all([n[0].isupper() for n in name_parts if n]):
+                # Don't add name variants if the potential middle names are lowercase,
+                # since this is typically something like
+                # "Karl I of Austria" or "William Howe, 5th Viscount Howe"
+                middle_name_synonyms.add(" ".join([n[0] for n in name_parts[1:-1] if n]) + " ")
+                middle_name_synonyms.add("".join([n[0] + "." for n in name_parts[1:-1] if n]) + " ")
+                middle_name_synonyms.add(" ".join([n[0] + "." for n in name_parts[1:-1] if n]) + " ")
+                middle_name_synonyms.add("")
+                middle_name_synonyms = [name_parts[0] + " " + m + name_parts[-1] for m in middle_name_synonyms]
+                print(f"Middle name synonyms for {entity_name}: {middle_name_synonyms}")
+        return middle_name_synonyms
 
     def link_entities(self, article: Article, doc: Optional[Doc] = None):
         if doc is None:
