@@ -178,7 +178,8 @@ class HyperlinkReferenceLinker:
                 num_expansions = 0
                 skip = False
                 while end_idx + 1 < len(article.text) and article.text[end_idx].isalpha():
-                    if num_expansions >= 3:  # to cover cases like Waldeck -> Waldeckers
+                    # Don't expand in cses like Waldeck -> Waldeckers or W (Vienna) -> War
+                    if num_expansions >= 3 or num_expansions >= len(link_text):
                         skip = True
                     end_idx += 1
                     num_expansions += 1
