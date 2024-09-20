@@ -4,10 +4,10 @@ import sys
 
 sys.path.append(".")
 
-from src import settings
-from src.utils import log
-from src.helpers.wikipedia_corpus import WikipediaCorpus
-from src.models.entity_database import EntityDatabase
+from elevant import settings
+from elevant.utils import log
+from elevant.helpers.wikipedia_corpus import WikipediaCorpus
+from elevant.models.entity_database import EntityDatabase
 
 
 def main():

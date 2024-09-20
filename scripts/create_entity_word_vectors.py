@@ -4,10 +4,10 @@ import pickle
 
 sys.path.append(".")
 
-from src import settings
-from src.utils import log
-from src.models.entity_database import EntityDatabase
-from src.helpers.word_vectors import VectorGenerator
+from elevant import settings
+from elevant.utils import log
+from elevant.models.entity_database import EntityDatabase
+from elevant.helpers.word_vectors import VectorGenerator
 
 
 def preprocess_description(description: str) -> str:

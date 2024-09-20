@@ -4,9 +4,9 @@ import re
 
 sys.path.append(".")
 
-from src import settings
-from src.utils import log
-from src.helpers.wikipedia_dump_reader import WikipediaDumpReader
+from elevant import settings
+from elevant.utils import log
+from elevant.helpers.wikipedia_dump_reader import WikipediaDumpReader
 
 
 def main(args):

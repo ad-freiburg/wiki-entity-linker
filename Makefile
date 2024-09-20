@@ -78,8 +78,8 @@ link_benchmarks:
 	    SYSTEM=spacy; \
 	    RESULT_NAME=$${SYSTEM}.wikipedia; \
 	  fi; \
-	  echo -e "$${DIM}python3 link_benchmark_entities.py $${RESULT_NAME} -l $${SYSTEM} -b ${BENCHMARK_NAMES} -dir ${EVALUATION_RESULTS_DIR} $${ARGUMENTS}$${RESET}"; \
-	  python3 link_benchmark_entities.py $${RESULT_NAME} -l $${SYSTEM} -b ${BENCHMARK_NAMES} -dir ${EVALUATION_RESULTS_DIR} $${ARGUMENTS}; \
+	  echo -e "$${DIM}python3 link_benchmark.py $${RESULT_NAME} -l $${SYSTEM} -b ${BENCHMARK_NAMES} -dir ${EVALUATION_RESULTS_DIR} $${ARGUMENTS}$${RESET}"; \
+	  python3 link_benchmark.py $${RESULT_NAME} -l $${SYSTEM} -b ${BENCHMARK_NAMES} -dir ${EVALUATION_RESULTS_DIR} $${ARGUMENTS}; \
 	done
 	@echo
 
@@ -116,7 +116,7 @@ convert_benchmark_predictions:
 	    echo -e "$${DIM}No rule for predictions from $${PREDICTION} found in Makefile.$${RESET}"; \
 	    continue; \
 	  fi; \
-	  python3 link_benchmark_entities.py $${RESULT_NAME} -pfile $${PFILE} -pformat $${PFORMAT} -pname "$${PNAME}" -b $${BENCHMARK} -dir $${EVALUATION_RESULTS_DIR}; \
+	  python3 link_benchmark.py $${RESULT_NAME} -pfile $${PFILE} -pformat $${PFORMAT} -pname "$${PNAME}" -b $${BENCHMARK} -dir $${EVALUATION_RESULTS_DIR}; \
 	done
 
 get_oracle_predictions:
@@ -134,8 +134,8 @@ evaluate_linking_results:
 	@echo
 	for BENCHMARK in $(BENCHMARK_NAMES); do \
 		echo; \
-		echo -e "$${DIM}python3 evaluate_linking_results.py ${EVALUATION_RESULTS_DIR}*/${EVALUATE_LINKING_SYSTEM_PREFIX}*$${BENCHMARK}.linked_articles.jsonl -b $${BENCHMARK}$${RESET}"; \
-		python3 evaluate_linking_results.py ${EVALUATION_RESULTS_DIR}*/${EVALUATE_LINKING_SYSTEM_PREFIX}*$${BENCHMARK}.linked_articles.jsonl -b $${BENCHMARK}; \
+		echo -e "$${DIM}python3 evaluate.py ${EVALUATION_RESULTS_DIR}*/${EVALUATE_LINKING_SYSTEM_PREFIX}*$${BENCHMARK}.linked_articles.jsonl -b $${BENCHMARK}$${RESET}"; \
+		python3 evaluate.py ${EVALUATION_RESULTS_DIR}*/${EVALUATE_LINKING_SYSTEM_PREFIX}*$${BENCHMARK}.linked_articles.jsonl -b $${BENCHMARK}; \
 	done
 
 # Only clone or build qlever if no qlever.master docker image exists
@@ -202,7 +202,7 @@ split_wiki:
 # Link Wikipedia dump only if it does not exist already at the specified location.
 link_wiki:
 	@if ls ${LINKED_WIKI_ARTICLES} 1> /dev/null 2>&1; then echo -e "$${RED}Linked Wikipedia dump already exists at ${LINKED_WIKI_ARTICLES} . Delete or rename it if you want to link another dump. Dump not linked.$${RESET}"; echo; else \
-	  python3 link_entities.py ${EXTRACTED_WIKI_DUMP} ${LINKED_WIKI_ARTICLES} -l popular-entities -hl hyperlink-reference -coref entity -m ${NUM_LINKER_PROCESSES}; \
+	  python3 link_text.py ${EXTRACTED_WIKI_DUMP} ${LINKED_WIKI_ARTICLES} -l popular-entities -hl hyperlink-reference -coref entity -m ${NUM_LINKER_PROCESSES}; \
 	fi
 
 generate_wikipedia_mappings: download_wiki extract_wiki split_wiki

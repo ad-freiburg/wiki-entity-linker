@@ -4,14 +4,15 @@ import argparse
 from pynif import NIFCollection
 from urllib.parse import quote
 
+from elevant.utils.knowledge_base_mapper import KnowledgeBaseMapper
+
 sys.path.append(".")
 
-from src import settings
-from src.utils import log
-from src.evaluation.benchmark import get_available_benchmarks
-from src.linkers.linkers import Linkers, HyperlinkLinkers, CoreferenceLinkers, PredictionFormats
-from src.linkers.linking_system import LinkingSystem
-from src.models.article import Article, article_from_json
+from elevant import settings
+from elevant.utils import log
+from elevant.linkers.linkers import Linkers, HyperlinkLinkers, CoreferenceLinkers, PredictionFormats
+from elevant.linkers.linking_system import LinkingSystem
+from elevant.models.article import Article, article_from_json
 
 app = Flask(__name__)
 
@@ -37,7 +38,7 @@ def nif_api():
             linking_system.link_entities(article, args.uppercase, args.only_pronouns, None)
         if article.entity_mentions:
             for em in sorted(article.entity_mentions.values()):
-                if em.entity_id is None:
+                if KnowledgeBaseMapper.is_unknown_entity(em.entity_id):
                     entity_uri = 'http://example.org/unknown/some_entity'
                 else:
                     if args.wikidata_annotations:

@@ -26,15 +26,16 @@ import re
 from typing import Optional
 from enum import Enum
 
+from elevant.utils.knowledge_base_mapper import KnowledgeBaseMapper
 
 sys.path.append(".")
 
-from src.utils import log
-from src.evaluation.benchmark import get_available_benchmarks
-from src.evaluation.benchmark_iterator import get_benchmark_iterator
-from src.helpers.wikipedia_dump_reader import WikipediaDumpReader
-from src.models.entity_database import EntityDatabase
-from src.models.article import Article, article_from_json
+from elevant.utils import log
+from elevant.evaluation.benchmark import get_available_benchmarks
+from elevant.evaluation.benchmark_iterator import get_benchmark_iterator
+from elevant.helpers.wikipedia_dump_reader import WikipediaDumpReader
+from elevant.models.entity_database import EntityDatabase
+from elevant.models.article import Article, article_from_json
 
 
 class Annotation(Enum):
@@ -74,15 +75,15 @@ def get_labeled_entity_text(article, text, offset, entity_db):
         return text, []
 
     label_entities = set()
-    for span, entity_id in sorted(article.labels, reverse=True):
-        begin, end = span
+    for gt_label in sorted(article.labels, reverse=True):
+        begin, end = gt_label.span
         begin -= offset
         end -= offset
         entity_text_snippet = text[begin:end]
-        entity_name = entity_db.get_entity_name(entity_id)
-        entity_string = "[%s:%s|%s]" % (entity_id, entity_name, entity_text_snippet)
+        entity_name = entity_db.get_entity_name(gt_label.entity_id)
+        entity_string = "[%s:%s|%s]" % (gt_label.entity_id, entity_name, entity_text_snippet)
         text = text[:begin] + entity_string + text[end:]
-        label_entities.add(entity_id)
+        label_entities.add(gt_label.entity_id)
     return text, list(label_entities)
 
 
@@ -92,7 +93,7 @@ def get_ner_text(article, text, offset):
 
     for label in sorted(article.labels, reverse=True):
         if label.parent is None and not label.is_optional():
-            if label.entity_id.startswith("Unknown"):  # and False:
+            if KnowledgeBaseMapper.is_unknown_entity(label.entity_id):  # and False:
                 continue
             begin, end = label.span
             begin -= offset
@@ -115,7 +116,7 @@ def get_linked_entity_text(article, text, offset, entity_db):
         end -= offset
         entity_text_snippet = text[begin:end]
         # Do not print entities that were recognized but not linked
-        if entity_mention.is_linked():
+        if not KnowledgeBaseMapper.is_unknown_entity(entity_mention.entity_id):
             entity_id = entity_mention.entity_id
             entity_name = entity_db.get_entity_name(entity_id)
             entity_string = "[%s:%s|%s]" % (entity_id, entity_name, entity_text_snippet)
