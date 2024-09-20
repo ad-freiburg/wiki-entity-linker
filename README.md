@@ -3,7 +3,8 @@
 This repository contains a version of [ELEVANT](https://github.com/ad-freiburg/elevant), a tool for evaluating,
  analysing and comparing entity linking systems, that includes linkers that are aimed at entity linking on Wikipedia.
 
-We summarized the most important information and instructions in this README. For further information, please check our [Wiki](https://github.com/ad-freiburg/elevant/wiki)
+We summarized the most important information and instructions in this README. For further information, please check
+our [Wiki](https://github.com/ad-freiburg/elevant/wiki).
 For a quick setup guide without lengthy explanations see [Quick Start](https://github.com/ad-freiburg/elevant/wiki/A-Quick-Start).
 
 ## Docker Instructions
