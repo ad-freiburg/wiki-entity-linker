@@ -1,7 +1,7 @@
-# Wiki Entity Linking
+# Wiki Entity Linker
 
-The Wiki Entity Linker is a tool for entity linking and coreference resolution specifically on Wikipedia.
-It uses intra-Wikipedia hyperlinks to produce high-quality entity linking results.
+The Wiki Entity Linker is a tool for entity linking and coreference resolution on Wikipedia.
+The Wiki Entity Linker utilizes intra-Wikipedia hyperlinks to produce high-quality entity linking results.
 
 The code is based on [ELEVANT](https://github.com/ad-freiburg/elevant), a tool for evaluating, analyzing and
  comparing entity linking systems. This way, the Wiki Entity Linker can be easily evaluated.
