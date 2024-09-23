@@ -10,9 +10,10 @@ sys.path.append(".")
 
 from elevant import settings
 from elevant.utils import log
-from elevant.linkers.linkers import Linkers, HyperlinkLinkers, CoreferenceLinkers, PredictionFormats
-from elevant.linkers.linking_system import LinkingSystem
 from elevant.models.article import Article, article_from_json
+
+from wiki_entity_linker.linkers.linkers import Linkers, HyperlinkLinkers, CoreferenceLinkers, PredictionFormats
+from wiki_entity_linker.linkers.linking_system import LinkingSystem
 
 app = Flask(__name__)
 

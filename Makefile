@@ -25,7 +25,7 @@ WIKIPEDIA_MAPPINGS_DIR = ${DATA_DIR}wikipedia_mappings/
 # Variables for benchmark linking and evaluation
 EVALUATION_RESULTS_DIR = evaluation-results/
 # Adjust if you only want to link or evaluate certain benchmarks
-BENCHMARK_NAMES = wiki-fair-no-coref news-fair-no-coref kore50 msnbc msnbc-updated spotlight # aida-conll-test aida-conll-dev
+BENCHMARK_NAMES = wiki-fair-no-coref wiki-fair wiki-fair-v2 wiki-fair-v2-no-coref
 # Adjust if you only want to link with certain linking systems.
 # The script arguments for a linking system can be adjusted in the link_benchmark target if needed.
 LINKING_SYSTEMS = refined rel dbpedia-spotlight tagme baseline # spacy.wikipedia spacy.wikidata

@@ -1,16 +1,15 @@
 [project]
-name = "elevant"
-version = "0.2.0"
+name = "wiki_entity_linker"
+version = "0.1.0"
 authors = [
-	{ name="Natalie Prange", email="prange@cs.uni-freiburg.de" },
-	{ name="Matthias Hertel", email="hertelm@cs.uni-freiburg.de" }
+	{ name="Natalie Prange", email="prange@cs.uni-freiburg.de" }
 ]
 maintainers = [ { name="Natalie Prange", email="prange@cs.uni-freiburg.de" } ]
-description = "Entity linking evaluation and analysis tool"
+description = "Wikipedia Entity Linker"
 readme = "README.md"
 license = { file = "LICENSE" }
 requires-python = ">=3.8"
-keywords = ["nlp", "entity-linking", "evaluation", "analysis"]
+keywords = ["nlp", "entity-linking", "wikipedia"]
 classifiers = [
 	"Programming Language :: Python :: 3"
 ]
@@ -22,8 +21,8 @@ dependencies = {file = ["requirements.txt"]}
 [project.scripts]
 
 [project.urls]
-Homepage = "https://github.com/ad-freiburg/elevant/"
-Issues = "https://github.com/ad-freiburg/elevant/issues"
+Homepage = "https://github.com/ad-freiburg/wiki_entity_linker/"
+Issues = "https://github.com/ad-freiburg/wiki_entity_linker/issues"
 
 [build-system]
 requires = ["setuptools>=61.0"]

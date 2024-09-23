@@ -25,10 +25,11 @@ from elevant.utils import log
 from elevant.utils.colors import Colors
 from elevant.evaluation.benchmark import get_available_benchmarks, Benchmark
 from elevant.evaluation.benchmark_iterator import get_benchmark_iterator
-from elevant.linkers.linkers import Linkers, HyperlinkLinkers, CoreferenceLinkers, PredictionFormats
-from elevant.linkers.linking_system import LinkingSystem
 from elevant.linkers.oracle_linker import link_entities_with_oracle
 from elevant.utils.utils import convert_to_filename
+
+from wiki_entity_linker.linkers.linkers import Linkers, HyperlinkLinkers, CoreferenceLinkers, PredictionFormats
+from wiki_entity_linker.linkers.linking_system import LinkingSystem
 
 
 def main(args):

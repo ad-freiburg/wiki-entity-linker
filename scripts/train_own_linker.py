@@ -15,12 +15,12 @@ from spacy.kb import KnowledgeBase
 
 sys.path.append(".")
 
-from src.helpers.entity_database_reader import EntityDatabaseReader
-from src.helpers.label_generator import LabelGenerator
-from src.utils.embeddings_extractor import EmbeddingsExtractor
-from src.models.neural_net import NeuralNet
-from src import settings
+from elevant.helpers.label_generator import LabelGenerator
+from elevant import settings
 
+from wiki_entity_linker.helpers.entity_database_reader import EntityDatabaseReader
+from wiki_entity_linker.utils.embeddings_extractor import EmbeddingsExtractor
+from wiki_entity_linker.models.neural_net import NeuralNet
 
 # Ensure reproducibility
 torch.manual_seed(42)
@@ -76,7 +76,7 @@ class EntityLinkingTrainer:
         rdf2vec_model = None
         if rdf2vec:
             logger.info("Loading rdf2vec model...")
-            rdf2vec_model = gensim.models.Word2Vec.load(settings.RDF2VEC_MODEL_PATH, mmap='r')
+            rdf2vec_model = gensim.models.Word2Vec.load(settings.DATA_DIRECTORY + "linker_files/entity_embeddings/wikid2vec_sg_500_7_4_15_4_500", mmap='r')
 
         self.entity_vector_length = rdf2vec_model.wv.vector_size if self.rdf2vec else self.kb.entity_vector_length
         self.embedding_extractor = EmbeddingsExtractor(self.entity_vector_length, self.kb, rdf2vec_model)
@@ -335,7 +335,7 @@ def main(args):
 
         model_name = "%s.%i.%iep.%ibs.%ihu.%slr.%sdo" % (version, n_samples, n_epochs, batch_size, hidden_units,
                                                          lr_str, do_str)
-        model_path = settings.LINKER_MODEL_PATH + model_name + ".pt"
+        model_path = settings.DATA_DIRECTORY + "linker_files/nn_linker_models/" + model_name + ".pt"
 
     # Load or train the model
     if args.load_model:

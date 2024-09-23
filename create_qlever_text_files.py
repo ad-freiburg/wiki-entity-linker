@@ -1,12 +1,13 @@
 import argparse
-import log
 import sys
 
 import spacy
 from spacy.tokens.doc import Doc
 from spacy.language import Language
 
-from src.models.article import article_from_json
+from elevant.utils import log
+from elevant.models.article import article_from_json
+from elevant.utils.knowledge_base_mapper import KnowledgeBaseMapper
 
 
 @Language.component("custom_sentence_boundaries")
@@ -66,8 +67,9 @@ def main(args):
 
                     if curr_em_span and tok.idx >= curr_em_span[0] and tok_end <= curr_em_span[1]:
                         entity_id = article.entity_mentions[curr_em_span].entity_id
-                        wordsfile.write("<http://www.wikidata.org/entity/%s>\t%d\t%d\t%d\n" %
-                                        (entity_id, 1, record_id, 1))
+                        if not KnowledgeBaseMapper.is_unknown_entity(entity_id):
+                            wordsfile.write("<http://www.wikidata.org/entity/%s>\t%d\t%d\t%d\n" %
+                                            (entity_id, 1, record_id, 1))
 
                 docsfile.write("%d\t%s\n" % (record_id, sent.text.strip("\n").replace("\n", " ")))
                 if args.articlesfile:

@@ -26,9 +26,10 @@ import multiprocessing
 
 from elevant import settings
 from elevant.utils import log
-from elevant.linkers.linkers import Linkers, HyperlinkLinkers, CoreferenceLinkers
 from elevant.models.article import Article, article_from_json
 from elevant.helpers.wikipedia_dump_reader import WikipediaDumpReader
+
+from wiki_entity_linker.linkers.linkers import Linkers, HyperlinkLinkers, CoreferenceLinkers
 
 # Don't show dependencygraph UserWarning: "The graph doesn't contain a node that depends on the root element."
 import warnings
@@ -40,7 +41,7 @@ warnings.filterwarnings("ignore", category=UserWarning)
 config = {"no_loading": True}
 with open(settings.TMP_FORKSERVER_CONFIG_FILE, "w", encoding="utf8") as config_file:
     json.dump(config, config_file)
-from elevant.linkers.forkserver_linking_system import linking_system
+from wiki_entity_linker.linkers.forkserver_linking_system import linking_system
 
 
 CHUNK_SIZE = 10  # Number of articles submitted to one process as a single task
@@ -88,7 +89,7 @@ def main():
     if args.multiprocessing > 1:
         logger.info("Loading linking system...")
         multiprocessing.set_start_method('forkserver')
-        multiprocessing.set_forkserver_preload(["elevant.linkers.forkserver_linking_system"])
+        multiprocessing.set_forkserver_preload(["wiki_entity_linker.linkers.forkserver_linking_system"])
         start = time.time()
         last_time = start
         with multiprocessing.Pool(processes=args.multiprocessing, maxtasksperchild=MAX_TASKS_PER_CHILD) as executor:
@@ -106,7 +107,7 @@ def main():
                     last_time = time.time()
         i -= 1  # So final log reports correct number of linked articles with and without multiprocessing
     else:
-        from elevant.linkers.linking_system import LinkingSystem
+        from wiki_entity_linker.linkers.linking_system import LinkingSystem
         ls = LinkingSystem(args.linker_name,
                            args.linker_config,
                            hyperlink_linker=args.hyperlink_linker,
