@@ -16,7 +16,13 @@ Get the code, and build and start the docker container:
 
     git clone https://github.com/ad-freiburg/wiki_entity_linker.git .
     docker build -t wiki_entity_linker .
-    docker run -it -p 8000:8000 -v <data_directory>:/data -v $(pwd)/evaluation-results/:/home/evaluation-results -v $(pwd)/benchmarks/:/home/benchmarks wiki_entity_linker
+    docker run -it -p 8000:8000 \
+        -v <data_directory>:/data \
+        -v $(pwd)/evaluation-results/:/home/evaluation-results \
+        -v $(pwd)/benchmarks/:/home/benchmarks \
+        -v /var/run/docker.sock:/var/run/docker.sock \
+        -v $(pwd)/wikidata-types/:/home/wikidata-types \
+        -e WIKIDATA_TYPES_PATH=$(pwd) wiki_entity_linker
 
 where `<data_directory>` is the directory in which the required data files will be stored. What these data files are
  and how they are generated is explained in section [Get the Data](#get-the-data). Make sure you can read from and
@@ -24,10 +30,10 @@ where `<data_directory>` is the directory in which the required data files will 
  `<data_directory>`, `evaluation-results` and `benchmarks`), for example (if security is not an issue) by giving all
  users read and write permissions to the directories in question with:
 
-    chmod a+rw -R <data_directory> evaluation-results/ benchmarks/
+    chmod a+rw -R <data_directory> evaluation-results/ benchmarks/ wikidata-types/
 
 
-Unless otherwise noted, all the following commands should be run inside the docker container.
+All the following commands should be run inside the docker container.
 
 
 ## Get the Data
@@ -35,22 +41,22 @@ For linking entities in text or evaluating the output of a linker, our system ne
  mention texts, e.g. entity names, aliases, popularity scores, types, the frequency with which a mention is linked
  to a certain article in Wikipedia, etc. This information is stored in and read from several files. Since these files
  are too large to upload them on GitHub, you can either download them from our servers (fast) or build them yourself
- (slow, RAM intensive, but the resulting files might be based on a more recent Wikidata/Wikipedia dump).
+ (slow, RAM intensive, but the resulting files will be based on recent Wikidata and Wikipedia dumps).
 
-To download the files, simply run
+To download the files from our servers, simply run
 
     make download_all
 
 This will automatically run `make download_wikidata_mappings`, `make download_wikipedia_mappings` and
  `make download_entity_types_mapping` which will download the compressed files, extract them and move them to the
- correct location. See [Mapping Files](https://github.com/ad-freiburg/elevant/wiki/Mapping-Files) for a description of files downloaded in this step.
+ correct location. See [Mapping Files](https://github.com/ad-freiburg/elevant/wiki/Mapping-Files) for a description of files downloaded in these steps.
 
 NOTE: This will overwrite existing Wikidata and Wikipedia mappings in your `<data_directory>` so make sure this is what 
  you want to do.
 
-If you rather want to build the mappings yourself, you can replace each *download* command (except `download_all`) by a
- *generate* command. See
- [Data Generation](https://github.com/ad-freiburg/elevant/wiki/Generating-Data) for more details.
+If you rather want to build the mappings yourself, you can run `make generate_all` to generate all required files, or
+ alternatively, replace only a specific *download* command by the corresponding *generate* command.
+See [Data Generation](https://github.com/ad-freiburg/elevant/wiki/Generating-Data) for more details.
 
 ## Link Wikipedia Dump
 If you want to use the Wiki Entity Linker to link an entire Wikipedia dump, follow these steps:
