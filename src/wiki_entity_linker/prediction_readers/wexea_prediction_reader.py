@@ -14,7 +14,7 @@ logger = logging.getLogger("main." + __name__.split(".")[-1])
 
 
 class WexeaPredictionReader(AbstractPredictionReader):
-    _link_re = re.compile(r"\[\[([^\[].*?)\|(.*?)\|(.*?[^\]])\]\]")
+    _link_re = re.compile(r"\[\[([^\[]*?\|)?([^\[]*?)\|([^\[]*?[^\]])\]\]")
 
     def __init__(self, input_filepath, entity_db: EntityDatabase):
         self.entity_db = entity_db
@@ -31,7 +31,7 @@ class WexeaPredictionReader(AbstractPredictionReader):
         text = ""
         predictions = dict()
         for link_match in WexeaPredictionReader._link_re.finditer(linked_text):
-            link_target = link_match.group(1)
+            link_target = link_match.group(1).strip("|") if link_match.group(1) else None
             link_text = link_match.group(2)
             link_type = link_match.group(3)
             text += linked_text[text_position:link_match.start()]
@@ -40,15 +40,18 @@ class WexeaPredictionReader(AbstractPredictionReader):
             link_end_pos = len(text)
             span = (link_start_pos, link_end_pos)
             text_position = link_match.end()
-            entity_id = KnowledgeBaseMapper.get_wikidata_qid(link_target, self.entity_db, verbose=False)
-            candidates = {entity_id}
-            if link_type == "UNKNOWN":
-                # These should not be added as predictions, since WEXEA considers them unlinked
-                continue
+            # if link_type in ("DATE", "NUMBER", "DURATION"):
+            #     # These should not be added as predictions, since WEXEA considers them unlinked
+            #     continue
             if link_type.startswith("DISAMBIGUATION"):
                 # These should not be added as predictions, since they can never be a correct link
+                # This does not seem to be used in the new WEXEA version anymore
                 continue
-            if (coref and link_type == "COREF") or (not coref and link_type != "COREF"):
+
+            entity_id = KnowledgeBaseMapper.get_wikidata_qid(link_target, self.entity_db, verbose=False)
+            candidates = {entity_id}
+            if (coref and "coref" in link_type) or (not coref and "coref" not in link_type):
+                # This does not seem to be used in the new WEXEA version anymore
                 predictions[span] = EntityPrediction(span, entity_id, candidates)
         text += linked_text[text_position:]
         return predictions
