@@ -92,7 +92,7 @@ class LinkingSystem(elevant.linkers.linking_system.LinkingSystem):
                                         MappingName.REDIRECTS})
             self.linker = TagMeLinker(self.entity_db, self.linker_config)
         elif linker_type == PredictionFormats.WEXEA.value:
-            from wiki_entity_linker.prediction_readers.wexea_prediction_reader import WexeaPredictionReader
+            from elevant.prediction_readers.wexea_prediction_reader import WexeaPredictionReader
             self.load_missing_mappings({MappingName.WIKIPEDIA_WIKIDATA,
                                         MappingName.REDIRECTS})
             self.prediction_reader = WexeaPredictionReader(prediction_file, self.entity_db)
@@ -239,7 +239,7 @@ class LinkingSystem(elevant.linkers.linking_system.LinkingSystem):
             from elevant.linkers.stanford_corenlp_coref_linker import StanfordCoreNLPCorefLinker
             self.coref_linker = StanfordCoreNLPCorefLinker()
         elif linker_type == CoreferenceLinkers.WEXEA.value:
-            from wiki_entity_linker.prediction_readers.wexea_prediction_reader import WexeaPredictionReader
+            from elevant.prediction_readers.wexea_prediction_reader import WexeaPredictionReader
             self.load_missing_mappings({MappingName.WIKIPEDIA_WIKIDATA,
                                         MappingName.REDIRECTS})
             self.coref_prediction_iterator = WexeaPredictionReader(prediction_file, self.entity_db)\
