@@ -7,10 +7,11 @@ RESET := \033[0m
 
 DATA_DIR = /local/data-ssd/entity-linking/
 
-WIKIPEDIA_DUMP_FILES_DIR = ${DATA_DIR}wikipedia_dump_files/
-WIKI_DUMP = ${WIKIPEDIA_DUMP_FILES_DIR}enwiki-latest-pages-articles-multistream.xml.bz2
-EXTRACTED_WIKI_DUMP = ${WIKIPEDIA_DUMP_FILES_DIR}enwiki-latest-extracted.jsonl
-LINKED_WIKI_ARTICLES = ${WIKIPEDIA_DUMP_FILES_DIR}enwiki-latest-linked.jsonl
+WIKIPEDIA_ARTICLES_DIR = ${DATA_DIR}wikipedia_articles/
+WIKI_DUMP = ${WIKIPEDIA_ARTICLES_DIR}enwiki-latest-pages-articles-multistream.xml.bz2
+EXTRACTED_WIKI_DUMP = ${WIKIPEDIA_ARTICLES_DIR}wikipedia.articles.jsonl
+RESULTS_DIR = ${DATA_DIR}results/
+LINKED_WIKI_ARTICLES = ${RESULTS_DIR}wikipedia.articles.linked.jsonl
 
 # Variables for generating wikidata mappings
 WIKIDATA_MAPPINGS_DIR = ${DATA_DIR}wikidata_mappings/
@@ -44,7 +45,7 @@ config:
 	@echo
 	@echo "Basic configuration variables:"
 	@echo
-	@for VAR in DATA_DIR WIKIPEDIA_DUMP_FILES_DIR WIKI_DUMP EXTRACTED_WIKI_DUMP LINKED_WIKI_ARTICLES \
+	@for VAR in DATA_DIR WIKIPEDIA_ARTICLES_DIR WIKI_DUMP EXTRACTED_WIKI_DUMP LINKED_WIKI_ARTICLES \
 	    WIKIDATA_MAPPINGS_DIR WIKIDATA_SPARQL_ENDPOINT DATA_QUERY_NAMES; do \
 	  printf "%-30s = %s\n" "$$VAR" "$${!VAR}"; done
 	@echo
@@ -142,6 +143,8 @@ generate_entity_types_mapping:
 	cd wikidata-types; chmod 777 index; $(MAKE) -sB WIKIDATA_SPARQL_ENDPOINT=${WIKIDATA_SPARQL_ENDPOINT} -f Makefile; cd ..
 	@[ -d ${WIKIDATA_MAPPINGS_DIR} ] || mkdir ${WIKIDATA_MAPPINGS_DIR}
 	mv wikidata-types/entity-types.tsv ${WIKIDATA_MAPPINGS_DIR}
+	# Remove old dbm database file if it exists and is not a directory
+	[ -f ${WIKIDATA_MAPPINGS_DIR}qid_to_whitelist_types.db ] && rm ${WIKIDATA_MAPPINGS_DIR}qid_to_whitelist_types.db
 	python3 scripts/create_databases.py ${WIKIDATA_MAPPINGS_DIR}entity-types.tsv -f multiple_values -o ${WIKIDATA_MAPPINGS_DIR}qid_to_whitelist_types.db
 
 download_all: download_wikidata_mappings download_wikipedia_mappings download_entity_types_mapping
@@ -173,7 +176,7 @@ download_spacy_linking_files:
 
 # Download Wikipedia dump only if it does not exist already at the specified location.
 download_wiki:
-	@[ -d ${WIKIPEDIA_DUMP_FILES_DIR} ] || mkdir ${WIKIPEDIA_DUMP_FILES_DIR}
+	@[ -d ${WIKIPEDIA_ARTICLES_DIR} ] || mkdir ${WIKIPEDIA_ARTICLES_DIR}
 	@if ls ${WIKI_DUMP} 1> /dev/null 2>&1; then echo -e "$${RED}Wikipedia dump already exists at ${WIKI_DUMP} . Delete or rename it if you want to download a new dump. Dump not downloaded.$${RESET}"; echo; else \
 	  wget https://dumps.wikimedia.org/enwiki/latest/enwiki-latest-pages-articles-multistream.xml.bz2 -O ${WIKI_DUMP}; \
 	fi
@@ -189,6 +192,7 @@ split_wiki:
 
 # Link Wikipedia dump only if it does not exist already at the specified location.
 link_wiki:
+	@[ -d ${RESULTS_DIR} ] || mkdir ${RESULTS_DIR}
 	@if ls ${LINKED_WIKI_ARTICLES} 1> /dev/null 2>&1; then echo -e "$${RED}Linked Wikipedia dump already exists at ${LINKED_WIKI_ARTICLES} . Delete or rename it if you want to link another dump. Dump not linked.$${RESET}"; echo; else \
 	  python3 link_text.py ${EXTRACTED_WIKI_DUMP} ${LINKED_WIKI_ARTICLES} -l popular-entities -hl hyperlink-reference -coref entity -m ${NUM_LINKER_PROCESSES}; \
 	fi
@@ -202,8 +206,10 @@ generate_wikipedia_mappings: download_wiki extract_wiki split_wiki
 	@[ -d ${WIKIPEDIA_MAPPINGS_DIR} ] || mkdir ${WIKIPEDIA_MAPPINGS_DIR}
 	python3 scripts/extract_akronyms.py
 	python3 scripts/extract_redirects.py ${WIKI_DUMP}
+	[ -f ${WIKIPEDIA_MAPPINGS_DIR}redirects.db ] && rm ${WIKIPEDIA_MAPPINGS_DIR}redirects.db
 	python3 scripts/create_databases.py ${WIKIPEDIA_MAPPINGS_DIR}redirects.pkl
 	python3 scripts/get_link_frequencies.py  # Needs redirects and qid_to_wikipedia_url.db
+	[ -f ${WIKIPEDIA_MAPPINGS_DIR}hyperlink_to_most_popular_candidates.db ] && rm ${WIKIPEDIA_MAPPINGS_DIR}hyperlink_to_most_popular_candidates.db
 	python3 scripts/create_databases.py ${WIKIPEDIA_MAPPINGS_DIR}hyperlink_frequencies.pkl -o ${WIKIPEDIA_MAPPINGS_DIR}hyperlink_to_most_popular_candidates.db  --most_popular_candidates
 	python3 scripts/extract_title_synonyms.py
 	python3 scripts/count_unigrams.py
@@ -238,11 +244,17 @@ generate_databases:
 	@echo
 	@echo "[generate_databases] Build databases from large Wikidata mappings."
 	@echo
+	[ -f ${WIKIDATA_MAPPINGS_DIR}wikipedia_name_to_qid.db ] && rm ${WIKIDATA_MAPPINGS_DIR}wikipedia_name_to_qid.db]
 	python3 scripts/create_databases.py ${WIKIDATA_MAPPINGS_DIR}qid_to_wikipedia_url.tsv -i -m name_from_url -o ${WIKIDATA_MAPPINGS_DIR}wikipedia_name_to_qid.db
+	[ -f ${WIKIDATA_MAPPINGS_DIR}qid_to_sitelinks.db ] && rm ${WIKIDATA_MAPPINGS_DIR}qid_to_sitelinks.db]
 	python3 scripts/create_databases.py ${WIKIDATA_MAPPINGS_DIR}qid_to_sitelinks.tsv
+	[ -f ${WIKIDATA_MAPPINGS_DIR}qid_to_label.db ] && rm ${WIKIDATA_MAPPINGS_DIR}qid_to_label.db]
 	python3 scripts/create_databases.py ${WIKIDATA_MAPPINGS_DIR}qid_to_label.tsv
+	[ -f ${WIKIDATA_MAPPINGS_DIR}label_to_qids.db ] && rm ${WIKIDATA_MAPPINGS_DIR}label_to_qids.db]
 	python3 scripts/create_databases.py ${WIKIDATA_MAPPINGS_DIR}qid_to_label.tsv -i -f multiple_values -o ${WIKIDATA_MAPPINGS_DIR}label_to_qids.db
+	[ -f ${WIKIDATA_MAPPINGS_DIR}alias_to_qids.db ] && rm ${WIKIDATA_MAPPINGS_DIR}alias_to_qids.db]
 	python3 scripts/create_databases.py ${WIKIDATA_MAPPINGS_DIR}qid_to_aliases.tsv -i -f multiple_values_semicolon_separated -o ${WIKIDATA_MAPPINGS_DIR}alias_to_qids.db
+	[ -f ${WIKIDATA_MAPPINGS_DIR}qid_to_aliases.db ] && rm ${WIKIDATA_MAPPINGS_DIR}qid_to_aliases.db]
 	python3 scripts/create_databases.py ${WIKIDATA_MAPPINGS_DIR}qid_to_aliases.tsv -f multiple_values_semicolon_separated
 
 cleanup:
