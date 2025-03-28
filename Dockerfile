@@ -31,7 +31,7 @@ CMD umask 000; /bin/bash;
 
 
 # Build the container:
-# docker build -t elevant .
+# docker build -t wiki_entity_linker .
 
 # Run the container:
-# docker run -it -p 8000:8000 -v <data_directory>:/data -v $(pwd)/evaluation-results/:/home/evaluation-results -v $(pwd)/benchmarks/:/home/benchmarks elevant
+# docker run -it -p 8000:8000 -v <data_directory>:/data -v $(pwd)/evaluation-results/:/home/evaluation-results -v $(pwd)/benchmarks/:/home/benchmarks wiki_entity_linker
