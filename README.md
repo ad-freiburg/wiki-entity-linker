@@ -14,15 +14,15 @@ For further information, particularly regarding the evaluation of the linker, pl
 ## Docker Instructions
 Get the code, and build and start the docker container:
 
-    git clone https://github.com/ad-freiburg/wiki_entity_linker.git .
-    docker build -t wiki_entity_linker .
+    git clone https://github.com/ad-freiburg/wiki-entity-linker.git .
+    docker build -t wiki-entity-linker .
     docker run -it -p 8000:8000 \
         -v <data_directory>:/data \
         -v $(pwd)/evaluation-results/:/home/evaluation-results \
         -v $(pwd)/benchmarks/:/home/benchmarks \
         -v /var/run/docker.sock:/var/run/docker.sock \
         -v $(pwd)/wikidata-types/:/home/wikidata-types \
-        -e WIKIDATA_TYPES_PATH=$(pwd) wiki_entity_linker
+        -e WIKIDATA_TYPES_PATH=$(pwd) wiki-entity-linker
 
 where `<data_directory>` is the directory in which the required data files will be stored. What these data files are
  and how they are generated is explained in section [Get the Data](#get-the-data). Make sure you can read from and
@@ -45,16 +45,16 @@ For linking entities in text or evaluating the output of a linker, our system ne
 
 To download the files from our servers, simply run
 
-    make download_all
+    make download-all
 
-This will automatically run `make download_wikidata_mappings`, `make download_wikipedia_mappings` and
- `make download_entity_types_mapping` which will download the compressed files, extract them and move them to the
+This will automatically run `make download-wikidata-mappings`, `make download-wikipedia-mappings` and
+ `make download-entity-types-mapping` which will download the compressed files, extract them and move them to the
  correct location. See [Mapping Files](https://github.com/ad-freiburg/elevant/wiki/Mapping-Files) for a description of files downloaded in these steps.
 
 NOTE: This will overwrite existing Wikidata and Wikipedia mappings in your `<data_directory>` so make sure this is what 
  you want to do.
 
-If you rather want to build the mappings yourself, you can run `make generate_all` to generate all required files, or
+If you rather want to build the mappings yourself, you can run `make generate-all` to generate all required files, or
  alternatively, replace only a specific *download* command by the corresponding *generate* command.
 See [Data Generation](https://github.com/ad-freiburg/elevant/wiki/Generating-Data) for more details.
 
@@ -62,7 +62,7 @@ See [Data Generation](https://github.com/ad-freiburg/elevant/wiki/Generating-Dat
 If you want to use the Wiki Entity Linker to link an entire Wikipedia dump, follow these steps:
 1) First download and extract a Wikipedia dump by running
 
-       make download_wiki extract_wiki
+       make download-wiki extract-wiki
         
     NOTE: If you built the Wikipedia mappings yourself instead of downloading them from our servers, then a Wikipedia
      dump was already downloaded and extracted, so you can skip this step. Unless you want to link a more recent dump
@@ -74,7 +74,7 @@ If you want to use the Wiki Entity Linker to link an entire Wikipedia dump, foll
 
 2) To link the downloaded Wikipedia dump using our best system run
     
-       make link_wiki
+       make link-wiki
     
 This uses our hyperlink-reference linker which links entities based on intra-Wikipedia hyperlinks, our popular-entities
  linker which links remaining entities based on their Wikidata sitelink count with special rules for demonyms,
@@ -123,7 +123,7 @@ To evaluate the Wiki Entity Linker, you can use the ELEVANT evaluation web app, 
 
 3) Start the evaluation web app by running
 
-       make start_webapp
+       make start-webapp
 
    You can then access the webapp at <http://0.0.0.0:8000/> and inspect the evaluation results.
 

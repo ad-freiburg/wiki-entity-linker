@@ -1,5 +1,5 @@
 [project]
-name = "wiki_entity_linker"
+name = "wiki-entity-linker"
 version = "0.2.0"
 authors = [
 	{ name="Natalie Prange", email="prange@cs.uni-freiburg.de" }

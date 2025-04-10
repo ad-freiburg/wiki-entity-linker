@@ -1,1 +1,1 @@
-elevant @ git+https://github.com/ad-freiburg/elevant@v0.4.0
+elevant @ git+https://github.com/ad-freiburg/elevant@v0.5.0
