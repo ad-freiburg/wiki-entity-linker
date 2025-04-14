@@ -33,7 +33,9 @@ where `<data_directory>` is the directory in which the required data files will 
     chmod a+rw -R <data_directory> evaluation-results/ benchmarks/ wikidata-types/
 
 
-All the following commands should be run inside the docker container.
+All the following commands should be run inside the docker container. If you want to use the system without docker,
+ follow the instructions in [Setup without Docker](https://github.com/ad-freiburg/elevant/wiki/Setup-Without-Docker)
+before continuing with the next section.
 
 
 ## Get the Data
